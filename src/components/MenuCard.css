@@ -1,0 +1,102 @@
+/* คอนเทนเนอร์หลักของการ์ด */
+.flip-card {
+  background-color: transparent;
+  width: 240px;
+  height: 240px;
+  perspective: 1000px; /* สร้างมิติความลึก */
+  cursor: pointer;
+}
+
+/* ส่วนที่ทำหน้าที่หมุน */
+.flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+/* เอฟเฟกต์เมื่อเอาเมาส์ไปวาง (Hover) */
+.flip-card:hover .flip-card-inner {
+  transform: rotateY(180deg);
+}
+
+/* กำหนดคุณสมบัติร่วมของทั้งสองด้าน */
+.flip-card-front,
+.flip-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden; /* ซ่อนด้านหลังเวลาพลิก */
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* สไตล์ด้านหน้า: สีขาวสะอาด */
+.flip-card-front {
+  background-color: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+}
+
+/* ไอคอนพร้อมแอนิเมชันดุ๊กดิ๊ก */
+.icon-container {
+  font-size: 4rem;
+  margin-bottom: 12px;
+  display: inline-block; /* ช่วยให้การหมุนสมูทขึ้น */
+  animation: dookdik 2s infinite ease-in-out; /* เรียกใช้ดุ๊กดิ๊ก */
+}
+
+.menu-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* สไตล์ด้านหลัง: สีทึบ (Solid Gradient) */
+.flip-card-back {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  transform: rotateY(180deg);
+}
+
+.back-content p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.click-hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* =========================================
+   แอนิเมชัน (Animations)
+========================================= */
+
+/* แอนิเมชันดุ๊กดิ๊ก (กระโดดและเอียงซ้ายขวาเบาๆ) */
+@keyframes dookdik {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(8deg);
+  }
+}
