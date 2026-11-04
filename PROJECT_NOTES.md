@@ -62,3 +62,11 @@
 - patientAvatar.ts: age bands 0–12 child, 13–19 teen, 20–59 adult, 60+ senior; use valid birthDate calculated in Bangkok time, otherwise validated recorded age. Gender uses explicit Thai male/female values; unknown values use a neutral standard. Unknown ages use a generic silhouette. Portraits are illustrations, not real patient photos or identity verification.
 - Dashboard.tsx: resolve visit patient by patientId first, then unique CN; ambiguous/missing matches fall back to available snapshot or generic avatar, never name-based inference.
 - Tests: 2 groups pass for age thresholds, blank/malformed information, birthday rollover, gender fallback and ID/CN matching. Build passes. UI scope only; patient records and bottom navigation unchanged.
+
+## 2026-11-04 — 3D nurse hero portrait
+
+- User explicitly authorized publication of the generated cartoon likeness to this public GitHub repository and the Clinic website.
+- public/images/clinic-nurse-hero-3d.webp: optimized transparent 3D cartoon nurse facing right, half-body crossed-arms pose, based on the user-provided reference. The source photograph is not uploaded.
+- Dashboard.tsx: place the nurse beside the clinic name in the existing hero, replacing the decorative medical cross.
+- Dashboard.css: responsive portrait sizing on desktop, tablet and mobile; preserve bottom navigation and other dashboard content.
+- Validation: npm run build passed. Generated PNG alpha verified before conversion to WebP. No changes to data, authentication, payment or stock behavior.
