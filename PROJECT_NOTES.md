@@ -70,3 +70,9 @@
 - Dashboard.tsx: place the nurse beside the clinic name in the existing hero, replacing the decorative medical cross.
 - Dashboard.css: responsive portrait sizing on desktop, tablet and mobile; preserve bottom navigation and other dashboard content.
 - Validation: npm run build passed. Generated PNG alpha verified before conversion to WebP. No changes to data, authentication, payment or stock behavior.
+
+## 2026-11-04 — Nurse placement adjustment
+
+- Dashboard.tsx: move the approved 3D nurse immediately adjacent to the clinic-name heading; restore the original decorative medical cross alongside the banner.
+- Dashboard.css: compact inline name/portrait layout at desktop/mobile sizes; preserve original decorative-art responsiveness and bottom navigation.
+- Validation: production build. No data or workflow changes.
