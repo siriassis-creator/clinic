@@ -1,51 +1,65 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import './Navbar.css';
 
-export default function Navbar() {
-  const location = useLocation();
+const primary = [
+  { to: '/', label: 'หน้าหลัก', icon: '🏠' },
+  { to: '/register', label: 'ผู้ป่วย', icon: '📝' },
+  { to: '/visits', label: 'ห้องตรวจ', icon: '🩺' },
+  { to: '/pharmacy', label: 'คลังยา', icon: '💊' },
+];
+const secondary = [
+  { to: '/appointments', label: 'นัดหมาย', icon: '📅' },
+  { to: '/pos', label: 'ขายยาหน้าร้าน', icon: '🛒' },
+  { to: '/reports', label: 'รายงาน', icon: '📊' },
+  { to: '/settings', label: 'ตั้งค่า', icon: '⚙️' },
+];
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
+export default function Navbar() {
+  const { pathname } = useLocation();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const moreActive = secondary.some(item => item.to === pathname);
+
+  useEffect(() => {
+    dialog.current?.close();
+    window.scrollTo({ top: 0 });
+  }, [pathname]);
 
   return (
-    <nav className="modern-navbar">
-      <div className="navbar-brand">
-        <span className="brand-icon">🏥</span>
-        Clinic<span className="brand-highlight">OS</span>
-      </div>
-
-      <div className="navbar-menu">
-        {/* เพิ่มไอคอน 🏠, 📝, 🩺, 💊, 📅 ด้านหน้าข้อความเมนู */}
-        <Link className={`nav-link ${isActive('/') ? 'active' : ''}`} to="/">
-          <span className="menu-icon">🏠</span> หน้าหลัก
-        </Link>
-        <Link
-          className={`nav-link ${isActive('/register') ? 'active' : ''}`}
-          to="/register"
-        >
-          <span className="menu-icon">📝</span> ลงทะเบียน
-        </Link>
-        <Link
-          className={`nav-link ${isActive('/opd') ? 'active' : ''}`}
-          to="/opd"
-        >
-          <span className="menu-icon">🩺</span> ห้องตรวจ
-        </Link>
-        <Link
-          className={`nav-link ${isActive('/pharmacy') ? 'active' : ''}`}
-          to="/pharmacy"
-        >
-          <span className="menu-icon">💊</span> จ่ายยา
-        </Link>
-        <Link
-          className={`nav-link ${isActive('/appointments') ? 'active' : ''}`}
-          to="/appointments"
-        >
-          <span className="menu-icon">📅</span> นัดหมาย
-        </Link>
-      </div>
-    </nav>
+    <>
+      <nav className="clinic-bottom-nav" aria-label="เมนูหลัก">
+        {primary.map(item => (
+          <NavLink key={item.to} to={item.to} end
+            className={({ isActive }) => `clinic-bottom-item${isActive ? ' is-active' : ''}`}>
+            <span className="clinic-bottom-icon" aria-hidden="true">{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+        <button type="button" className={`clinic-bottom-item${moreActive ? ' is-active' : ''}`}
+          aria-haspopup="dialog" aria-controls="clinic-more-menu"
+          onClick={() => dialog.current?.showModal()}>
+          <span className="clinic-bottom-icon" aria-hidden="true">☰</span>
+          <span>เพิ่มเติม</span>
+        </button>
+      </nav>
+      <dialog ref={dialog} id="clinic-more-menu" className="clinic-more-dialog" aria-labelledby="clinic-more-title"
+        onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+        <div className="clinic-more-panel">
+          <div className="clinic-more-header">
+            <h2 id="clinic-more-title">เมนูเพิ่มเติม</h2>
+            <button type="button" onClick={() => dialog.current?.close()} aria-label="ปิดเมนูเพิ่มเติม">✕</button>
+          </div>
+          <div className="clinic-more-grid">
+            {secondary.map(item => (
+              <NavLink key={item.to} to={item.to}
+                onClick={() => dialog.current?.close()}
+                className={({ isActive }) => `clinic-more-link${isActive ? ' is-active' : ''}`}>
+                <span aria-hidden="true">{item.icon}</span>{item.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      </dialog>
+    </>
   );
 }

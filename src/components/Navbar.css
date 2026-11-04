@@ -1,36 +1,44 @@
-/* เพิ่มเติม: สไตล์สำหรับไอคอนในเมนู */
-.menu-icon {
-  margin-right: 6px; /* ระยะห่างระหว่างไอคอนกับข้อความ */
-  font-size: 1.1rem; /* ขนาดไอคอน */
+.clinic-bottom-nav {
+  position: fixed; z-index: 50; inset: auto 0 0;
+  display: flex; justify-content: center; align-items: stretch;
+  padding: 7px 8px calc(7px + env(safe-area-inset-bottom, 0px));
+  background: #fffefa; border-top: 1px solid #e7e4dc;
+  box-shadow: 0 -3px 16px rgb(15 23 42 / 5%);
 }
-
-/* ปรับปุ่มเมนูให้จัดวางไอคอนและข้อความตรงกัน (แก้ทับ .nav-link เดิม) */
-.nav-link {
-  text-decoration: none;
-  color: #64748b;
-  font-weight: 600;
-  font-size: 1rem;
-  padding: 10px 18px;
-  border-radius: 6px;
-  transition: all 0.2s ease-in-out;
-  border: 1px solid transparent;
-
-  /* เพิ่ม Flexbox เพื่อจัดตำแหน่งไอคอนกับข้อความให้อยู่กึ่งกลางในแนวนอน */
-  display: inline-flex;
-  align-items: center;
+.clinic-bottom-item {
+  min-width: 100px; min-height: 52px; padding: 0 13px;
+  border: 1px solid transparent; border-radius: 12px; background: transparent;
+  color: #64748b; display: flex; align-items: center; justify-content: center;
+  gap: 8px; font: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; text-decoration: none; box-sizing: border-box;
 }
-
-/* เอฟเฟกต์เวลาเอาเมาส์ชี้ (คงเดิม) */
-.nav-link:hover {
-  color: #4f46e5;
-  background-color: #f8fafc;
-  border-color: #e2e8f0;
+.clinic-bottom-item.is-active, .clinic-more-link.is-active {
+  color: #4f46e5; background: #eef2ff; border-color: #c7d2fe;
 }
-
-/* เอฟเฟกต์เมื่อคลิกอยู่ที่หน้านั้น (Active) (คงเดิม) */
-.nav-link.active {
-  color: #ffffff;
-  background-color: #4f46e5;
-  border-color: #4f46e5;
-  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+.clinic-bottom-item:focus-visible, .clinic-more-panel button:focus-visible, .clinic-more-link:focus-visible {
+  outline: 2px solid #4f46e5; outline-offset: -2px;
+}
+.clinic-bottom-icon { font-size: 20px; line-height: 1; }
+.clinic-app-content { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+.clinic-app-content .dashboard-container {
+  height: auto; min-height: calc(100dvh - 90px - env(safe-area-inset-bottom, 0px));
+  max-height: none; overflow: visible;
+}
+.clinic-more-dialog {
+  position: fixed; inset: auto 0 0; margin: 0 auto; padding: 0;
+  width: min(100%, 560px); max-width: 100%; max-height: 80dvh;
+  border: 0; border-radius: 24px 24px 0 0; color: #334155; background: #fffefa;
+  box-shadow: 0 -8px 40px rgb(15 23 42 / 15%);
+}
+.clinic-more-dialog::backdrop { background: rgb(15 23 42 / 35%); }
+.clinic-more-panel { padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.clinic-more-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.clinic-more-header h2 { margin: 0; font-size: 18px; }
+.clinic-more-header button { min-width: 44px; min-height: 44px; border: 0; border-radius: 12px; background: #f1f5f9; color: #475569; cursor: pointer; }
+.clinic-more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.clinic-more-link { min-height: 76px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0; border-radius: 16px; text-decoration: none; color: #475569; font-size: 14px; font-weight: 600; }
+.clinic-more-link span { font-size: 24px; }
+@media (max-width: 767px) {
+  .clinic-bottom-nav { justify-content: space-between; padding-left: 2px; padding-right: 2px; }
+  .clinic-bottom-item { flex: 1 1 0; min-width: 0; min-height: 54px; padding: 4px 1px; flex-direction: column; gap: 4px; font-size: 11px; }
 }
