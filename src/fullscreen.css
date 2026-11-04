@@ -1,0 +1,24 @@
+/* Shared page canvas. Dialogs and popovers retain their own readable sizing. */
+html, body, #root { width: 100%; min-height: 100%; margin: 0; }
+#root { min-height: 100dvh; }
+.clinic-app-content { --clinic-nav-clearance: calc(90px + env(safe-area-inset-bottom, 0px)); width: 100%; min-height: 100dvh; box-sizing: border-box; padding-bottom: var(--clinic-nav-clearance); }
+.clinic-app-content > :is(.reg-container, .report-page-full, .dashboard-container, .visit-workspace, .v-full-screen) {
+  width: 100%; max-width: none; margin: 0; box-sizing: border-box;
+  min-height: calc(100dvh - var(--clinic-nav-clearance));
+  height: auto; max-height: none; padding: clamp(12px, 2vw, 28px); overflow: visible;
+}
+.clinic-app-content > .reg-container > .reg-card,
+.clinic-app-content .report-wrapper-full,
+.clinic-app-content .visit-workspace .reg-card {
+  width: 100%; max-width: none !important; margin-left: 0; margin-right: 0; box-sizing: border-box;
+}
+.clinic-app-content .visit-workspace .reg-container { min-height: 0; width: 100%; box-sizing: border-box; }
+.clinic-app-content :is(.reg-form, .reg-group, .flex-1, .header-info) { min-width: 0; }
+.clinic-app-content .table-container { max-width: 100%; overflow-x: auto; }
+.clinic-app-content .report-top-bar { flex-wrap: wrap; gap: 16px; }
+.login-container { width: 100%; min-height: 100dvh; box-sizing: border-box; }
+@media (max-width: 600px) {
+  .clinic-app-content > :is(.reg-container, .report-page-full, .dashboard-container, .visit-workspace, .v-full-screen) { padding: 12px; }
+  .clinic-app-content .reg-row { flex-wrap: wrap; }
+  .clinic-app-content .reg-row > .reg-group { min-width: min(100%, 240px); }
+}

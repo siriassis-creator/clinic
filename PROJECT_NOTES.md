@@ -39,3 +39,10 @@
 - Browser QA: two synthetic patients opened; distinct forms; switching back preserved the first patient's complaint. No production patient data used. Temporary mock files/config were removed before build.
 - npm run build passes. Existing bundle-size warning remains.
 - Limitations: live Firebase authentication/rules and multi-device behavior require validation with an authorized clinic account. Existing legacy/POS stock mutations remain outside these new transactions. Drafts are scoped to the signed-in user. No automatic drug selection or diagnosis.
+
+## 2026-11-04 — Full-screen page layout
+
+- src/fullscreen.css: consistent full-width page canvas and minimum viewport height after bottom-navigation clearance; remove room and Settings width caps, allow Dashboard/page scrolling, retain safe-area spacing, responsive form wrapping and horizontal table scrolling. Dialogs keep their own width limits. Login canvas fills the viewport while the form stays readable.
+- src/main.tsx: load the shared layout after page/component styles.
+- Scope: layout only; data, drafts, dispensing, payments and authentication unchanged.
+- Validation: npm run build. Authenticated screens require signed-in visual verification.
