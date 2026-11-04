@@ -30,7 +30,7 @@ export default function Appointments() {
 
       // กรองออก: แสดงเฉพาะรายการที่ยังไม่มีสถานะการติดตาม
       const pendingList = list.filter(
-        (appt) => !appt.followUpStatus || appt.followUpStatus === ''
+        (appt) => appt.workflowStatus !== 'draft' && (!appt.followUpStatus || appt.followUpStatus === '')
       );
 
       setAllAppointments(

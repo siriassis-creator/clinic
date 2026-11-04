@@ -28,3 +28,14 @@
 - public/pill-favicon.svg: new scalable capsule icon in Clinic indigo/white, with a pale background for small browser tabs.
 - index.html: point favicon to the new filename to avoid reuse of the old cached icon.
 - Scope: browser favicon only; application screens and data logic unchanged.
+
+## 2026-11-04 — Patient case workspace
+
+- Visits.tsx and VisitWorkspace.css: separate persistent patient tabs, searchable opening, duplicate-patient resume, hide/reopen tabs, database drafts with visible save/error state, and restore unfinished cases for the signed-in account.
+- visitWorkflow.ts: deterministic active draft ID per owner/patient, revision checks to prevent stale overwrites; draft -> awaiting_medicine -> awaiting_payment -> paid. Completion validates quantities/prices; dispensing checks current stock/expiry and writes stock plus medicine_history atomically. Payment archives once and removes the active draft atomically. Completed history is read-only from Visits.
+- Reports.tsx: new workflow cases count toward income only after paid, using paidAt; legacy visits/POS retain prior behavior. Report patient/Dx/medicine statistics for new cases currently follow the paid-case reporting set.
+- Dashboard.tsx and Appointments.tsx: exclude draft appointments from reminders.
+- Tests: node --test tests/visit-workflow.test.mjs passes 3 suites covering separate drafts, stale writes, insufficient stock rollback, single dispense/payment, archive and reopening, invalid prescriptions. Transaction tests use a serialized atomic mock, not a Firestore emulator.
+- Browser QA: two synthetic patients opened; distinct forms; switching back preserved the first patient's complaint. No production patient data used. Temporary mock files/config were removed before build.
+- npm run build passes. Existing bundle-size warning remains.
+- Limitations: live Firebase authentication/rules and multi-device behavior require validation with an authorized clinic account. Existing legacy/POS stock mutations remain outside these new transactions. Drafts are scoped to the signed-in user. No automatic drug selection or diagnosis.
