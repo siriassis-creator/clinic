@@ -55,3 +55,10 @@
 - tests/dashboard-summary.test.mjs: 2 tests pass for Thai date boundary, draft/payment semantics, stock categories, user scoping and empty data. Production build passes; existing bundle-size warning remains.
 - Browser QA: dashboard and bottom menu render at desktop and 390px using isolated synthetic fixtures. Temporary fixtures and aliases removed before build. Live authenticated Firebase data not independently tested.
 - Scope: summary UI/read-only aggregation; patient, stock mutation, payment, login and navigation logic retained.
+
+## 2026-11-04 — Standard patient avatars
+
+- PatientAvatar.tsx / PatientAvatar.css: reusable local SVG person portraits replacing initial letters in latest registrations and appointments, and activity dots in recent visits. Patient names remain visible. No photos uploaded or external image services used.
+- patientAvatar.ts: age bands 0–12 child, 13–19 teen, 20–59 adult, 60+ senior; use valid birthDate calculated in Bangkok time, otherwise validated recorded age. Gender uses explicit Thai male/female values; unknown values use a neutral standard. Unknown ages use a generic silhouette. Portraits are illustrations, not real patient photos or identity verification.
+- Dashboard.tsx: resolve visit patient by patientId first, then unique CN; ambiguous/missing matches fall back to available snapshot or generic avatar, never name-based inference.
+- Tests: 2 groups pass for age thresholds, blank/malformed information, birthday rollover, gender fallback and ID/CN matching. Build passes. UI scope only; patient records and bottom navigation unchanged.
