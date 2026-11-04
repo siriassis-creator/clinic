@@ -46,3 +46,12 @@
 - src/main.tsx: load the shared layout after page/component styles.
 - Scope: layout only; data, drafts, dispensing, payments and authentication unchanged.
 - Validation: npm run build. Authenticated screens require signed-in visual verification.
+
+## 2026-11-04 — Management summary dashboard
+
+- Dashboard.tsx / Dashboard.css: replace large menu cards with a blue clinical overview inspired by the provided reference. Banner, six summary metrics, today's appointments, seven-day treatment/new-patient trend, recent patients, inventory donut, low/expired stock alerts, diagnosis ranking, recent visits, six-month income/stock-receipt chart and active-case counts. Responsive desktop grid/mobile stack. Bottom navigation unchanged; no sidebar added.
+- dashboardSummary.ts: Bangkok-local date aggregation; exclude drafts and walk-in POS from clinical counts, count workflow revenue only after payment, preserve legacy revenue behavior. Active-case counts are scoped to the current account. Stock donut buckets are mutually exclusive. Receipt cost explicitly labelled approximate from recorded/current medicine cost, not total accounting expense.
+- Live Firestore listeners with cleanup; visible loading, source errors and empty states. Patient search and month selector work locally with real loaded data. No fabricated growth percentages, appointment times or sample records in production.
+- tests/dashboard-summary.test.mjs: 2 tests pass for Thai date boundary, draft/payment semantics, stock categories, user scoping and empty data. Production build passes; existing bundle-size warning remains.
+- Browser QA: dashboard and bottom menu render at desktop and 390px using isolated synthetic fixtures. Temporary fixtures and aliases removed before build. Live authenticated Firebase data not independently tested.
+- Scope: summary UI/read-only aggregation; patient, stock mutation, payment, login and navigation logic retained.

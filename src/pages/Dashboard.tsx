@@ -1,201 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
+import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { db, auth } from '../services/firebase';
+import { buildDashboard, bangkokDate } from '../services/dashboardSummary';
 import './Dashboard.css';
 
+type Row = Record<string, any>;
+const money = (n:number) => n.toLocaleString('th-TH',{maximumFractionDigits:2});
+const number = (n:number) => n.toLocaleString('th-TH');
+const colors = ['#2ab59a','#f3b94e','#f07179'];
+function Empty({text='ยังไม่มีข้อมูลในช่วงนี้'}:{text?:string}) {return <div className="overview-empty">{text}</div>;}
 export default function Dashboard() {
-  const navigate = useNavigate();
-
-  // --- 1. State สำหรับข้อมูลหน้าจอ ---
-  const [clinicName, setClinicName] = useState('กำลังโหลด...');
-  const [clinicSubtitle, setClinicSubtitle] = useState('');
-  const [notifyCount, setNotifyCount] = useState(0);
-  const [pharmacyCount, setPharmacyCount] = useState(0);
-
-  useEffect(() => {
-    let unsubAppt: () => void;
-    let unsubPharma: () => void;
-    let unsubSettings: () => void;
-
-    const startListeners = async () => {
-      // 🏥 ฟังชื่อคลินิก 2 บรรทัดแบบ Real-time
-      unsubSettings = onSnapshot(doc(db, 'settings', 'appointment'), (snap) => {
-        if (snap.exists()) {
-          setClinicName(snap.data().clinicName || 'เอื้องฟ้าคลินิก');
-          setClinicSubtitle(
-            snap.data().clinicSubtitle || 'การพยาบาลและการผดุงครรภ์'
-          );
-        }
-      });
-
-      // 🔴 แก้ไขการนับ Badge แจ้งเตือนนัดหมาย
-      const settingsSnap = await getDoc(doc(db, 'settings', 'appointment'));
-      const alertDays = settingsSnap.exists()
-        ? settingsSnap.data().alertDays
-        : 3;
-
-      const qAppt = query(
-        collection(db, 'visits'),
-        where('nextAppt', '!=', '')
-      );
-      unsubAppt = onSnapshot(qAppt, (snap) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const count = snap.docs.filter((doc) => {
-          const data = doc.data();
-
-          // 🆕 เพิ่มเงื่อนไข: นับเฉพาะที่ยังไม่มีสถานะการติดตาม (Pending)
-          const isPending = !data.followUpStatus || data.followUpStatus === '';
-
-          const apptDate = new Date(data.nextAppt);
-          const diffDays = Math.ceil(
-            (apptDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-          // ต้องยังไม่ถูกจัดการ และ อยู่ในช่วงวันที่แจ้งเตือน
-          return data.workflowStatus !== 'draft' && isPending && diffDays >= 0 && diffDays <= alertDays;
-        }).length;
-
-        setNotifyCount(count);
-      });
-
-      // 🟡 แจ้งเตือนสต็อกยาต่ำ
-      unsubPharma = onSnapshot(collection(db, 'pharmacy'), (snap) => {
-        const count = snap.docs.filter((doc) => {
-          const data = doc.data();
-          return Number(data.stockQty) <= Number(data.minAlert);
-        }).length;
-        setPharmacyCount(count);
-      });
-    };
-
-    startListeners();
-    return () => {
-      if (unsubAppt) unsubAppt();
-      if (unsubPharma) unsubPharma();
-      if (unsubSettings) unsubSettings();
-    };
-  }, []);
-
-  const handleLogout = () => {
-    if (window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
-      auth.signOut();
-    }
-  };
-
-  const menus = [
-    {
-      title: 'ทะเบียนผู้ป่วย',
-      desc: 'จัดการเวชระเบียน',
-      icon: '📝',
-      path: '/register',
-      color: '#4f46e5',
-    },
-    {
-      title: 'บันทึกการตรวจ',
-      desc: 'บันทึกอาการ (OPD)',
-      icon: '🩺',
-      path: '/visits',
-      color: '#10b981',
-    },
-    {
-      title: 'นัดหมาย',
-      desc: 'ตารางนัดหมายล่วงหน้า',
-      icon: '📅',
-      path: '/appointments',
-      color: '#f59e0b',
-      badgeValue: notifyCount,
-    },
-    {
-      title: 'คลังยา',
-      desc: 'สต็อกยาและเวชภัณฑ์',
-      icon: '💊',
-      path: '/pharmacy',
-      color: '#ec4899',
-      badgeValue: pharmacyCount,
-    },
-    {
-      title: 'ขายยาหน้าร้าน',
-      desc: 'ขายยาคนไข้ทั่วไป',
-      icon: '🛒',
-      path: '/pos', // เราจะสร้าง path นี้ใหม่
-      color: '#8b5cf6', // สีม่วงเข้ม
-    },
-    {
-      title: 'รายงาน',
-      desc: 'สรุปสถิติการรักษา',
-      icon: '📊',
-      path: '/reports',
-      color: '#06b6d4',
-    },
-    {
-      title: 'ตั้งค่า',
-      desc: 'ระบบและผู้ใช้งาน',
-      icon: '⚙️',
-      path: '/settings',
-      color: '#64748b',
-    },
+  const navigate=useNavigate();
+  const [clinic,setClinic]=useState({name:'เอื้องฟ้าคลินิก',subtitle:'การพยาบาลและการผดุงครรภ์'});
+  const [data,setData]=useState<Record<string,Row[]>>({patients:[],visits:[],pharmacy:[],medicine_history:[]});
+  const [loaded,setLoaded]=useState<Record<string,boolean>>({});
+  const [errors,setErrors]=useState<Record<string,string>>({});
+  const [month,setMonth]=useState(()=>bangkokDate(new Date()).slice(0,7));
+  const [search,setSearch]=useState('');
+  useEffect(()=>{
+    const stop=['patients','visits','pharmacy','medicine_history'].map(name=>onSnapshot(collection(db,name),snap=>{
+      setData(prev=>({...prev,[name]:snap.docs.map(d=>({id:d.id,...d.data()}))}));setLoaded(prev=>({...prev,[name]:true}));setErrors(prev=>({...prev,[name]:''}));
+    },error=>{setLoaded(prev=>({...prev,[name]:true}));setErrors(prev=>({...prev,[name]:error.message}));}));
+    stop.push(onSnapshot(doc(db,'settings','appointment'),snap=>{if(snap.exists())setClinic({name:snap.data().clinicName||'เอื้องฟ้าคลินิก',subtitle:snap.data().clinicSubtitle||'การพยาบาลและการผดุงครรภ์'});}));
+    return ()=>stop.forEach(fn=>fn());
+  },[]);
+  const summary=useMemo(()=>buildDashboard(data,month,new Date(),auth.currentUser?.uid),[data,month]);
+  const loading=Object.keys(loaded).length<4;
+  const failed=Object.values(errors).some(Boolean);
+  const ready=!loading&&!failed;
+  const found=search.trim()?data.patients.filter(p=>`${p.firstName||''} ${p.lastName||''} ${p.cn||''}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0,6):[];
+  const openPatient=(p:Row)=>navigate('/visits',{state:{patient:p}});
+  const stats=[
+    {icon:'👥',label:'ผู้ป่วยทั้งหมด',value:number(data.patients.length),unit:'คน',detail:'ทะเบียนผู้ป่วย',path:'/register',tone:'blue'},
+    {icon:'🩺',label:'ตรวจรักษาเดือนนี้',value:number(summary.monthClinical.length),unit:'ครั้ง',detail:'ไม่รวมฉบับร่าง / ขายยาหน้าร้าน',path:'/visits',tone:'green'},
+    {icon:'📅',label:'นัดหมายวันนี้',value:number(summary.appointments.length),unit:'รายการ',detail:'นัดที่ยังไม่ติดตาม',path:'/appointments',tone:'purple'},
+    {icon:'📦',label:'ยาและเวชภัณฑ์',value:number(data.pharmacy.length),unit:'รายการ',detail:`สต็อกต่ำ ${summary.low.length} · หมดอายุ ${summary.expired.length}`,path:'/pharmacy',tone:'amber'},
+    {icon:'฿',label:'รายรับเดือนนี้',value:'฿ '+money(summary.income),unit:'',detail:'รับชำระแล้ว รวมขายหน้าร้าน',path:'/reports',tone:'blue'},
+    {icon:'↗',label:'มูลค่ารับยาเข้าเดือนนี้',value:'฿ '+money(summary.expense),unit:'',detail:'ประมาณจากราคาทุนปัจจุบัน',path:'/reports',tone:'rose'},
   ];
-
-  return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="clinic-logo-section">
-          <span className="clinic-icon-main">🌸</span>
-          <div className="clinic-title-group">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1>{clinicName}</h1>
-              <button className="mini-logout-btn" onClick={handleLogout}>
-                Logout
-              </button>
-            </div>
-            <p className="clinic-subtitle">{clinicSubtitle}</p>
-          </div>
-        </div>
-      </header>
-
-      <div className="menu-grid">
-        {menus.map((menu, index) => (
-          <div
-            key={index}
-            className="menu-card"
-            onClick={() => navigate(menu.path)}
-            style={
-              {
-                '--menu-color': menu.color,
-                position: 'relative',
-              } as React.CSSProperties
-            }
-          >
-            {menu.badgeValue !== undefined && menu.badgeValue > 0 && (
-              <div
-                className={`appointment-badge ${
-                  menu.badgeValue > 99 ? 'plus' : ''
-                }`}
-              >
-                {menu.badgeValue > 99 ? '99+' : menu.badgeValue}
-              </div>
-            )}
-            <div className="card-pattern-bg">{menu.icon}</div>
-            <div className="card-content">
-              <div className="icon-main-box">{menu.icon}</div>
-              <div className="text-content">
-                <h3>{menu.title}</h3>
-                <p>{menu.desc}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+  return <div className="dashboard-container clinic-overview">
+    <section className="overview-hero">
+      <div className="hero-copy"><span className="hero-eyebrow">CLINIC CARE · ภาพรวมการดูแลผู้ป่วย</span><h1>{clinic.name}</h1><h2>บริหารจัดการครบ จบในที่เดียว</h2><p>{clinic.subtitle}</p><div className="hero-tags"><span>✚ ผู้ป่วย</span><span>✓ การรักษา</span><span>◷ นัดหมาย</span><span>▣ ยาและเวชภัณฑ์</span></div></div>
+      <div className="hero-medical" aria-hidden="true"><div className="medical-orbit"><span>✚</span></div><div className="medical-line"></div><span className="medical-caption">PATIENT CARE</span></div>
+      <div className="hero-features"><div><span>👥</span><strong>จัดการผู้ป่วย</strong><small>ทะเบียนและประวัติการรักษา</small></div><div><span>🩺</span><strong>ติดตามการตรวจ</strong><small>ฉบับร่าง จ่ายยา และชำระเงิน</small></div><div><span>📅</span><strong>นัดหมาย</strong><small>ติดตามนัดและการดูแลต่อเนื่อง</small></div><div><span>💊</span><strong>คลังยา</strong><small>ตรวจสต็อกและวันหมดอายุ</small></div><p>ข้อมูลสรุปอัปเดตจากระบบ · เมนูการใช้งานอยู่ด้านล่าง</p></div>
+    </section>
+    <div className="overview-toolbar"><div><h2>ภาพรวมการบริหารจัดการ</h2><span>{new Date().toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'long',year:'numeric'})}</span></div><div className="overview-tools"><div className="overview-search"><input aria-label="ค้นหาผู้ป่วย" placeholder="ค้นหาชื่อผู้ป่วย หรือ CN..." value={search} onChange={e=>setSearch(e.target.value)}/>{search.trim()&&<div className="overview-results">{found.length?found.map(p=><button key={p.id} onClick={()=>openPatient(p)}>{p.firstName} {p.lastName}<small>{p.cn}</small></button>):<p>ไม่พบผู้ป่วย</p>}</div>}</div><input type="month" aria-label="เดือนที่แสดงข้อมูล" value={month} onChange={e=>{if(e.target.value)setMonth(e.target.value);}}/><button className="overview-logout" onClick={()=>{if(window.confirm('ออกจากระบบ?'))void auth.signOut();}}>ออกจากระบบ</button></div></div>
+    {failed&&<p className="overview-error" role="alert">โหลดข้อมูลสรุปไม่ครบ กรุณาตรวจสิทธิ์หรือเชื่อมต่อใหม่ — {Object.entries(errors).filter(([,v])=>v).map(([k])=>k).join(', ')}</p>}
+    <section className="overview-stats" aria-label="ตัวเลขสรุป">{stats.map(s=><button key={s.label} className="overview-stat" onClick={()=>navigate(s.path)}><span className={'stat-icon '+s.tone}>{s.icon}</span><div><span className="stat-label">{s.label.replace('เดือนนี้',month===bangkokDate(new Date()).slice(0,7)?'เดือนนี้':'เดือนที่เลือก')}</span><strong>{ready?s.value:'—'} <small>{s.unit}</small></strong></div><p>{loading?'กำลังโหลดข้อมูล...':failed?'ข้อมูลยังไม่พร้อม':s.detail}</p></button>)}</section>
+    <div className="overview-grid">
+      <section className="overview-panel appointments"><div className="panel-heading"><h3>นัดหมายวันนี้</h3><button onClick={()=>navigate('/appointments')}>ดูทั้งหมด ↗</button></div>{ready?(summary.appointments.length?<div className="overview-list">{summary.appointments.slice(0,5).map(v=><button key={v.id} onClick={()=>navigate('/appointments')}><span className="patient-avatar">{(v.patientName||'ผ').slice(0,1)}</span><span><strong>{v.patientName||'ไม่ระบุชื่อ'}</strong><small>{v.cn||'—'} · ยังไม่ติดตาม</small></span><span className="list-badge amber">วันนี้</span></button>)}</div>:<Empty text="วันนี้ไม่มีนัดที่รอติดตาม"/>):<Empty text={loading?'กำลังโหลด...':'ไม่สามารถแสดงข้อมูล'}/>}</section>
+      <section className="overview-panel trend"><div className="panel-heading"><h3>สถิติการรักษา</h3><span>7 วันล่าสุด</span></div>{ready?<div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={summary.week} margin={{top:12,right:12,left:-25,bottom:0}}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6edf5"/><XAxis dataKey="label" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend iconType="circle"/><Area type="monotone" dataKey="visits" name="การรักษา" stroke="#2389d7" fill="#2389d7" fillOpacity={.08} strokeWidth={2}/><Area type="monotone" dataKey="patients" name="ผู้ป่วยใหม่" stroke="#2ab59a" fill="#2ab59a" fillOpacity={.04} strokeWidth={2}/></AreaChart></ResponsiveContainer></div>:<Empty/>}</section>
+      <section className="overview-panel new-patients"><div className="panel-heading"><h3>ผู้ป่วยลงทะเบียนล่าสุด</h3><button onClick={()=>navigate('/register')}>ดูทั้งหมด ↗</button></div>{ready?(summary.recentPatients.length?<div className="overview-list">{summary.recentPatients.map(p=><button key={p.id} onClick={()=>openPatient(p)}><span className="patient-avatar">{(p.firstName||'ผ').slice(0,1)}</span><span><strong>{p.firstName} {p.lastName}</strong><small>{p.cn||'—'}</small></span><small className="list-date">{p.createdAt?new Date(p.createdAt).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'}):'ไม่ระบุวันที่'}</small></button>)}</div>:<Empty/>):<Empty/>}</section>
+      <section className="overview-panel inventory"><div className="panel-heading"><h3>สถานะยาและเวชภัณฑ์</h3><button onClick={()=>navigate('/pharmacy')}>ดูทั้งหมด ↗</button></div>{ready&&data.pharmacy.length?<><div className="inventory-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={summary.stock} dataKey="value" nameKey="name" innerRadius="65%" outerRadius="90%" stroke="none">{summary.stock.map((s,i)=><Cell key={s.name} fill={colors[i]}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer><div><strong>{data.pharmacy.length}</strong><small>รายการ</small></div></div><div className="stock-legend">{summary.stock.map((s,i)=><span key={s.name}><i style={{background:colors[i]}}/>{s.name}<strong>{s.value}</strong></span>)}</div></>:<Empty text={loading?'กำลังโหลด...':'ยังไม่มีรายการยา'}/>}</section>
+      <section className="overview-panel alerts"><div className="panel-heading"><h3>รายการที่ต้องดูแล</h3><button onClick={()=>navigate('/pharmacy')}>ดูทั้งหมด ↗</button></div>{ready?(summary.alerts.length?<div className="overview-alerts">{summary.alerts.slice(0,5).map(m=><button key={m.id} onClick={()=>navigate('/pharmacy')}><span>{m.isExpired?'⏱':'⚠'}</span><div><strong>{m.tradeName||m.genericName||'ไม่ระบุชื่อยา'}</strong><small>{m.isExpired?'หมดอายุ '+m.expiryDate:`เหลือ ${m.stockQty} ${m.unit||'หน่วย'} · ขั้นต่ำ ${m.minAlert||0}`}</small></div><span className={'list-badge '+(m.isExpired?'rose':'amber')}>{m.isExpired?'หมดอายุ':'สต็อกต่ำ'}</span></button>)}</div>:<Empty text="ไม่พบยาหมดอายุหรือสต็อกต่ำ"/>):<Empty/>}</section>
+      <section className="overview-panel diagnosis"><div className="panel-heading"><h3>การวินิจฉัยที่พบบ่อย</h3><span>เดือนที่เลือก</span></div>{ready&&summary.diagnoses.length?<div className="diagnosis-bars">{summary.diagnoses.map((d,i)=><div key={d.name}><span>{i+1}. {d.name}</span><div><i style={{width:`${d.count/summary.diagnoses[0].count*100}%`}}/></div><strong>{d.count}</strong></div>)}</div>:<Empty/>}</section>
+      <section className="overview-panel activity"><div className="panel-heading"><h3>กิจกรรมการตรวจล่าสุด</h3><button onClick={()=>navigate('/visits')}>ห้องตรวจ ↗</button></div>{ready&&summary.recentVisits.length?<div className="overview-list">{summary.recentVisits.map(v=><button key={v.id} onClick={()=>navigate('/visits')}><span className="activity-dot"/><span><strong>{v.patientName||'ไม่ระบุชื่อ'}</strong><small>{summary.status(v.workflowStatus)} · {v.vn||v.cn}</small></span><small className="list-date">{new Date(v.updatedAt||v.visitDate).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'})}</small></button>)}</div>:<Empty/>}</section>
+      <section className="overview-panel finance"><div className="panel-heading"><h3>รายรับและมูลค่ารับยาเข้า</h3><button onClick={()=>navigate('/reports')}>รายงาน ↗</button></div>{ready?<><div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={summary.finance} margin={{top:10,right:8,left:-12,bottom:0}}><CartesianGrid vertical={false} stroke="#e6edf5"/><XAxis dataKey="label" tick={{fontSize:11}}/><YAxis tick={{fontSize:11}} tickFormatter={v=>Number(v)>=1000?`${Number(v)/1000}k`:String(v)}/><Tooltip formatter={v=>money(Number(v))+' บาท'}/><Legend iconType="circle"/><Bar dataKey="income" name="รายรับ" fill="#2ab59a" radius={[3,3,0,0]}/><Bar dataKey="expense" name="รับยาเข้า (ประมาณ)" fill="#f07179" radius={[3,3,0,0]}/></BarChart></ResponsiveContainer></div><p className="finance-footnote">มูลค่ารับยาเข้าอ้างอิงทุนปัจจุบัน ไม่ใช่รายจ่ายบัญชีทั้งหมด</p></>:<Empty/>}</section>
+      <section className="overview-panel case-summary"><div className="panel-heading"><h3>เคสที่กำลังดำเนินการ</h3><span>บัญชีนี้</span></div><div className="case-summary-list">{[['กำลังตรวจ',summary.pending.draft],['รอรับยา',summary.pending.awaiting_medicine],['รอชำระเงิน',summary.pending.awaiting_payment]].map(([label,count])=><div key={label}><span>{label}</span><strong>{ready?count:'—'} <small>เคส</small></strong></div>)}</div><button className="overview-primary" onClick={()=>navigate('/visits')}>เปิดห้องตรวจ ↗</button><p className="finance-footnote">ฉบับร่างยังไม่ตัดสต็อกและไม่นับเป็นรายรับ</p></section>
     </div>
-  );
+  </div>;
 }
