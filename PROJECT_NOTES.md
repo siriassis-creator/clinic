@@ -76,3 +76,10 @@
 - Dashboard.tsx: move the approved 3D nurse immediately adjacent to the clinic-name heading; restore the original decorative medical cross alongside the banner.
 - Dashboard.css: compact inline name/portrait layout at desktop/mobile sizes; preserve original decorative-art responsiveness and bottom navigation.
 - Validation: production build. No data or workflow changes.
+
+
+## 2026-11-04 — Approved full-height nurse hero
+- Files: src/pages/Dashboard.tsx, src/pages/Dashboard.css.
+- Replaced small nurse beside clinic name with one full-height nurse in the approved position. Enlarged medical cross as faint watermark behind nurse. Removed PATIENT CARE text and decorative line.
+- Preserved clinic copy, four feature cards and bottom navigation. Responsive art sizing for tablet/mobile; no database or workflow changes.
+- Validation: TypeScript/Vite production build; production deployment to Kitti's Clinic project requested.
