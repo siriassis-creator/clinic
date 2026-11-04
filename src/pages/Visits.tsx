@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   collection,
@@ -9,10 +9,14 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  runTransaction,
+  getDoc,
 } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import BackButton from '../components/BackButton';
 import './Visits.css';
+import './VisitWorkspace.css';
+import { finishCase, saveCaseDraft, startCase, stageLabel } from '../services/visitWorkflow';
 
 const initialVisitState = {
   chiefComplaint: '',
@@ -30,21 +34,31 @@ const initialVisitState = {
   totalAmount: 0,
 };
 
-export default function Visits() {
+function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; seed: any }) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'info' | 'history' | 'record'>(
-    'info'
+    'record'
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [allPatients, setAllPatients] = useState<any[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
+  const selectedPatient = patient;
   const [patientHistory, setPatientHistory] = useState<any[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);
   const [inventory, setInventory] = useState<any[]>([]);
   const [isPrescriptionModalOpen, setIsPrescriptionModalOpen] = useState(false);
   const [medSearch, setMedSearch] = useState('');
   const [editVisitId, setEditVisitId] = useState<string | null>(null);
-  const [visitData, setVisitData] = useState(initialVisitState);
+  const [visitData, setVisitData] = useState({ ...initialVisitState, ...seed });
+  const [stage, setStage] = useState(seed.workflowStatus || 'draft');
+  const [saveState, setSaveState] = useState('บันทึกฉบับร่างแล้ว');
+  const [busy, setBusy] = useState(false);
+  const revision = useRef(seed.revision || 0);
+  const queue = useRef(Promise.resolve());
+  const latest = useRef(visitData);
+  const stageRef = useRef(stage);
+  latest.current = visitData;
+  stageRef.current = stage;
+  const [conflict, setConflict] = useState(false);
 
   const [dxOptions, setDxOptions] = useState<string[]>([]);
   const [isDxModalOpen, setIsDxModalOpen] = useState(false);
@@ -108,36 +122,49 @@ export default function Visits() {
   };
 
   useEffect(() => {
-    if (location.state?.patient) handleSelectPatient(location.state.patient);
-  }, [location]);
+    return onSnapshot(query(collection(db, 'visits'), where('cn', '==', patient.cn)), snap => {
+      const history = snap.docs.map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(v => !v.workflowStatus || v.workflowStatus === 'paid');
+      setPatientHistory(history.sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()));
+    });
+  }, [patient.cn]);
 
   useEffect(() => {
-    const total = visitData.prescriptions.reduce(
-      (sum, item) =>
-        sum + Number(item.sellingPrice || 0) * Number(item.qtyToGive || 0),
-      0
-    );
-    setVisitData((prev) => ({ ...prev, totalAmount: total }));
+    const total = visitData.prescriptions.reduce((sum: number, item: any) => sum + Number(item.sellingPrice || 0) * Number(item.qtyToGive || 0), 0);
+    setVisitData((prev: any) => prev.totalAmount === total ? prev : { ...prev, totalAmount: total });
   }, [visitData.prescriptions]);
 
-  const handleSelectPatient = (patient: any) => {
-    setSelectedPatient(patient);
-    setSearchTerm('');
-    setActiveTab('info');
-    const q = query(collection(db, 'visits'), where('cn', '==', patient.cn));
-    onSnapshot(q, (snap) => {
-      const history = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setPatientHistory(
-        history.sort(
-          (a: any, b: any) =>
-            new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()
-        )
-      );
+  const persist = (data: any) => {
+    setSaveState('กำลังเก็บฉบับร่าง...');
+    const task = queue.current.then(async () => {
+      revision.current = await saveCaseDraft(caseId, data, revision.current);
+      setSaveState('บันทึกฉบับร่างแล้ว');
+    });
+    queue.current = task.catch(() => {});
+    return task.catch(error => {
+      setSaveState('บันทึกไม่สำเร็จ: ' + error.message);
+      if (error.message.includes('อุปกรณ์อื่น')) setConflict(true);
+      throw error;
     });
   };
+  useEffect(() => {
+    if (stage !== 'draft' || editVisitId || conflict) return;
+    const timer = setTimeout(() => { void persist(visitData).catch(() => {}); }, 800);
+    return () => clearTimeout(timer);
+  }, [visitData, stage, editVisitId, conflict]);
+  useEffect(() => () => {
+    if (stageRef.current === 'draft') void persist(latest.current).catch(() => {});
+  }, []);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (saveState !== 'บันทึกฉบับร่างแล้ว') { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saveState]);
 
   const addMedicine = (med: any) => {
-    if (visitData.prescriptions.find((p) => p.id === med.id))
+    if (visitData.prescriptions.find((p: any) => p.id === med.id))
       return alert('ยานี้อยู่ในรายการแล้ว');
     setVisitData({
       ...visitData,
@@ -168,7 +195,7 @@ export default function Visits() {
   };
 
   const updateMedQty = (id: string, qty: string) => {
-    const updated = visitData.prescriptions.map((p) =>
+    const updated = visitData.prescriptions.map((p: any) =>
       p.id === id ? { ...p, qtyToGive: Number(qty) } : p
     );
     setVisitData({ ...visitData, prescriptions: updated });
@@ -176,7 +203,7 @@ export default function Visits() {
 
   // ฟังก์ชันอัปเดตราคา (สำหรับค่าบริการโดยเฉพาะ)
   const updateItemPrice = (id: string, price: string) => {
-    const updated = visitData.prescriptions.map((p) =>
+    const updated = visitData.prescriptions.map((p: any) =>
       p.id === id ? { ...p, sellingPrice: Number(price) } : p
     );
     setVisitData({ ...visitData, prescriptions: updated });
@@ -185,119 +212,39 @@ export default function Visits() {
   const removeMedicine = (id: string) => {
     setVisitData({
       ...visitData,
-      prescriptions: visitData.prescriptions.filter((p) => p.id !== id),
+      prescriptions: visitData.prescriptions.filter((p: any) => p.id !== id),
     });
   };
 
-  const handleSaveVisit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!visitData.chiefComplaint || !visitData.diagnosis)
-      return alert('กรุณากรอกข้อมูลให้ครบถ้วน');
-
-    try {
-      const finalData = { ...visitData, updatedAt: new Date().toISOString() };
-
-      if (editVisitId) {
-        await updateDoc(doc(db, 'visits', editVisitId), finalData);
-        alert('✅ อัปเดตข้อมูลสำเร็จ');
-      } else {
-        const vn = `VN${new Date()
-          .toISOString()
-          .slice(0, 10)
-          .replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-        await addDoc(collection(db, 'visits'), {
-          ...finalData,
-          cn: selectedPatient.cn,
-          patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
-          vn,
-          visitDate: new Date().toISOString(),
-        });
-
-        for (const med of visitData.prescriptions) {
-          if (!med.isService) {
-            const currentInStock = inventory.find((i) => i.id === med.id);
-            if (currentInStock) {
-              await updateDoc(doc(db, 'pharmacy', med.id), {
-                stockQty: (
-                  Number(currentInStock.stockQty) - Number(med.qtyToGive)
-                ).toString(),
-              });
-              await addDoc(collection(db, 'medicine_history'), {
-                medicineId: med.id,
-                type: 'OUT',
-                amount: med.qtyToGive,
-                note: `จ่ายยาคนไข้ CN: ${selectedPatient.cn} (VN: ${vn})`,
-                timestamp: new Date().toISOString(),
-              });
-            }
-          }
-        }
-        alert(`✅ บันทึกสำเร็จเรียบร้อย`);
-      }
-      setVisitData(initialVisitState);
-      setEditVisitId(null);
-      setActiveTab('history');
-    } catch (err) {
-      alert('❌ เกิดข้อผิดพลาด');
+  const transition = async () => {
+    if (busy || conflict) return;
+    if (stage === 'draft' && (!visitData.chiefComplaint || !visitData.diagnosis)) {
+      alert('กรุณาระบุอาการสำคัญและการวินิจฉัย'); return;
     }
+    const next = stage === 'draft' ? 'awaiting_medicine' : stage === 'awaiting_medicine' ? 'awaiting_payment' : 'paid';
+    if (!window.confirm(next === 'paid' ? `ยืนยันรับชำระ ${visitData.totalAmount} บาท?` : next === 'awaiting_payment' ? 'ยืนยันส่งมอบยาและตัดสต็อก?' : 'ยืนยันตรวจเสร็จ? ยังไม่ตัดยาและยังไม่รับชำระเงิน')) return;
+    setBusy(true);
+    try {
+      if (stage === 'draft') await persist(visitData);
+      await queue.current;
+      const result = await finishCase(caseId, stage, revision.current);
+      revision.current = result.revision;
+      setStage(next);
+      setSaveState(next === 'paid' ? 'รับชำระแล้ว' : 'บันทึกสถานะแล้ว');
+    } catch (error: any) { alert(error.message); }
+    finally { setBusy(false); }
   };
-
-  const handleEditClick = (v: any) => {
-    setEditVisitId(v.id);
-    setVisitData({
-      ...v,
-      prescriptions: v.prescriptions || [],
-      totalAmount: v.totalAmount || 0,
-    });
-    setActiveTab('record');
-  };
+  const handleSaveVisit = async (e: React.FormEvent) => { e.preventDefault(); await transition(); };
+  const handleEditClick = (_visit?: any) => alert('ประวัติที่จ่ายยาแล้วเปิดดูได้เท่านั้น กรุณาเปิดเคสใหม่สำหรับการตรวจครั้งใหม่');
 
   return (
     <div className={selectedPatient ? 'reg-container' : 'v-full-screen'}>
-      <BackButton />
-
-      {!selectedPatient && (
-        <div className="v-search-section is-centered">
-          <h1>🩺 ค้นหาประวัติผู้ป่วย</h1>
-          <div className="v-search-box-wrapper">
-            <input
-              type="text"
-              placeholder="พิมพ์ชื่อ หรือ CN..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <div className="v-search-dropdown">
-                {allPatients
-                  .filter(
-                    (p) =>
-                      p.firstName
-                        ?.toLowerCase()
-                        .includes(searchTerm.toLowerCase()) ||
-                      p.cn?.includes(searchTerm)
-                  )
-                  .slice(0, 5)
-                  .map((p) => (
-                    <div
-                      key={p.id}
-                      className="v-search-item"
-                      onClick={() => handleSelectPatient(p)}
-                    >
-                      <div className="v-item-info">
-                        <strong>
-                          {p.firstName} {p.lastName}
-                        </strong>
-                        <br />
-                        <small>CN: {p.cn}</small>
-                      </div>
-                      <div className="v-item-action">เลือก ➔</div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <div className="case-status-bar">
+        <strong>{stageLabel(stage)}</strong><span role="status">{saveState}</span>
+        {stage !== 'paid' && <button type="button" disabled={busy || conflict} onClick={transition}>
+          {busy ? 'กำลังดำเนินการ...' : stage === 'draft' ? 'ตรวจเสร็จ → รอรับยา' : stage === 'awaiting_medicine' ? 'ยืนยันจ่ายยา → รอชำระเงิน' : `รับชำระ ${visitData.totalAmount} บาท`}
+        </button>}
+      </div>
 
       {selectedPatient && (
         <div className="reg-card fade-in">
@@ -325,7 +272,7 @@ export default function Visits() {
                     activeTab === 'record' ? 'active' : ''
                   }`}
                   onClick={() => {
-                    if (!editVisitId) setVisitData(initialVisitState);
+
                     setActiveTab('record');
                   }}
                 >
@@ -426,7 +373,7 @@ export default function Visits() {
             )}
 
             {activeTab === 'record' && (
-              <form onSubmit={handleSaveVisit} className="fade-in">
+              <form onSubmit={handleSaveVisit} className="fade-in"><fieldset disabled={stage !== 'draft' || busy || conflict} style={{border:0,padding:0,margin:0,minWidth:0}}>
                 <div className="reg-section">
                   <div className="reg-group">
                     <label>อาการสำคัญ (CC)</label>
@@ -623,7 +570,7 @@ export default function Visits() {
                             </tr>
                           </thead>
                           <tbody>
-                            {visitData.prescriptions.map((p, i) => (
+                            {visitData.prescriptions.map((p: any, i: number) => (
                               <tr key={p.id}>
                                 <td>
                                   <div style={{ fontWeight: '600' }}>
@@ -850,25 +797,21 @@ export default function Visits() {
                       className="btn-cancel"
                       style={{ flex: 1, height: '60px', fontSize: '1.2rem' }}
                       onClick={() => {
-                        setVisitData(initialVisitState);
-                        setEditVisitId(null);
-                        setActiveTab('history');
+                        if (window.confirm('ล้างข้อมูลในฉบับร่างนี้?')) setVisitData(initialVisitState);
                       }}
                     >
-                      ✖ ยกเลิก
+                      ล้างฉบับร่าง
                     </button>
                     <button
                       type="submit"
                       className="btn-submit"
                       style={{ flex: 1, height: '60px', fontSize: '1.2rem' }}
                     >
-                      {editVisitId
-                        ? '💾 อัปเดตข้อมูล'
-                        : '💾 บันทึกและตัดสต็อกยา'}
+                      ตรวจเสร็จ → รอรับยา
                     </button>
                   </div>
                 </div>
-              </form>
+              </fieldset></form>
             )}
 
             {activeTab === 'history' && (
@@ -940,8 +883,7 @@ export default function Visits() {
                             className="btn-action delete"
                             style={{ background: '#ef4444', color: 'white' }}
                             onClick={() => {
-                              if (window.confirm('ลบประวัตินี้?'))
-                                deleteDoc(doc(db, 'visits', v.id));
+                              alert('ไม่สามารถลบประวัติที่จ่ายยาแล้วจากหน้าห้องตรวจได้');
                             }}
                           >
                             🗑️
@@ -1565,4 +1507,48 @@ export default function Visits() {
       )}
     </div>
   );
+}
+
+
+export default function Visits() {
+  const location = useLocation();
+  const [patients, setPatients] = useState<any[]>([]);
+  const [cases, setCases] = useState<any[]>([]);
+  const [active, setActive] = useState('');
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+  const [opening, setOpening] = useState(false);
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => onSnapshot(collection(db, 'patients'), snap => setPatients(snap.docs.map(d => ({id:d.id,...d.data()}))), e => setError(e.message)), []);
+  useEffect(() => onSnapshot(query(collection(db, 'visits'), where('ownerUid', '==', auth.currentUser?.uid || '')), snap => {
+    const rows = snap.docs.map(d => ({id:d.id,...d.data()} as any)).filter(v => ['draft','awaiting_medicine','awaiting_payment'].includes(v.workflowStatus));
+    setCases(rows);
+  }, e => setError('ไม่สามารถโหลดฉบับร่าง: '+e.message)), []);
+  const open = async (patient: any) => {
+    if (opening) return;
+    setOpening(true); setError('');
+    try { const id = await startCase(patient); setHidden(h => h.filter(x => x !== id)); setActive(id); setSearch(''); }
+    catch(e:any) { setError('เปิดเคสไม่สำเร็จ: '+e.message); }
+    finally {setOpening(false);}
+  };
+  useEffect(() => { if (location.state?.patient) void open(location.state.patient); }, [location.key]);
+  const visible = cases.filter(c => !hidden.includes(c.id));
+  const selected = visible.some(c => c.id === active) ? active : visible[0]?.id;
+  return <div className="visit-workspace">
+    <BackButton />
+    <header className="workspace-header"><h1>🩺 ห้องตรวจ</h1><span>ฉบับร่างแยกตามผู้ป่วย · ตรวจ → จ่ายยา → รับชำระเงิน</span></header>
+    {error && <p role="alert">{error}</p>}
+    <div className="workspace-search"><input aria-label="ค้นหาผู้ป่วยเพื่อเปิดแท็บ" placeholder="+ เปิดผู้ป่วยเพิ่ม — ชื่อ หรือ CN" value={search} onChange={e=>setSearch(e.target.value)} />
+      {search && <div className="workspace-results">{patients.filter(p => `${p.firstName} ${p.lastName} ${p.cn}`.toLowerCase().includes(search.toLowerCase())).slice(0,8).map(p => <button key={p.id} disabled={opening} onClick={()=>open(p)}>{p.firstName} {p.lastName} · {p.cn}</button>)}</div>}
+    </div>
+    {hidden.length > 0 && <button onClick={()=>setHidden([])}>เปิดฉบับร่างที่ซ่อนไว้ ({hidden.length})</button>}
+    <div className="patient-case-tabs" role="tablist" aria-label="เคสผู้ป่วยที่เปิดอยู่">{visible.map(c => <div className="patient-case-tab" key={c.id}>
+      <button role="tab" id={'tab-'+c.id} aria-selected={selected===c.id} aria-controls={'panel-'+c.id} onClick={()=>setActive(c.id)}>{c.patientName}<small>{c.cn} · {stageLabel(c.workflowStatus)}</small></button>
+      <button aria-label={'ซ่อนแท็บ '+c.patientName} onClick={()=>{if(window.confirm('ซ่อนแท็บนี้? ฉบับร่างที่บันทึกแล้วจะยังอยู่ เปิดกลับได้'))setHidden(h=>[...h,c.id]);}}>×</button>
+    </div>)}</div>
+    {!visible.length && <p className="workspace-empty">ค้นหาผู้ป่วยเพื่อเริ่มตรวจ หรือเปิดฉบับร่างเดิมกลับมาทำต่อ</p>}
+    {visible.map(c => <section key={c.id} role="tabpanel" id={'panel-'+c.id} aria-labelledby={'tab-'+c.id} hidden={selected!==c.id}>
+      <PatientCase patient={patients.find(p=>p.id===c.patientId)||{...c.patientSnapshot,id:c.patientId,cn:c.cn}} caseId={c.id} seed={c} />
+    </section>)}
+  </div>;
 }

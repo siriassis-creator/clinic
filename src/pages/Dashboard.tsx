@@ -62,7 +62,7 @@ export default function Dashboard() {
           );
 
           // ต้องยังไม่ถูกจัดการ และ อยู่ในช่วงวันที่แจ้งเตือน
-          return isPending && diffDays >= 0 && diffDays <= alertDays;
+          return data.workflowStatus !== 'draft' && isPending && diffDays >= 0 && diffDays <= alertDays;
         }).length;
 
         setNotifyCount(count);
