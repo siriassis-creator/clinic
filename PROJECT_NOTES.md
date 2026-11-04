@@ -22,3 +22,9 @@
 - src/App.tsx: mount navigation inside router only when authenticated, and reserve bottom content space. Login and route guards retained.
 - Validation: npm run build passed; isolated component browser check at 390px confirmed primary navigation, opening More, selecting Reports and closing the dialog. Authenticated Firebase flows not tested.
 - Scope: navigation/layout only; patient records, prescribing, stock and Firebase configuration unchanged.
+
+## 2026-11-04 — Medicine favicon
+
+- public/pill-favicon.svg: new scalable capsule icon in Clinic indigo/white, with a pale background for small browser tabs.
+- index.html: point favicon to the new filename to avoid reuse of the old cached icon.
+- Scope: browser favicon only; application screens and data logic unchanged.
