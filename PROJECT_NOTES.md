@@ -97,3 +97,7 @@
 
 ## Dashboard reveal timing
 - Dashboard cards wait for the initial data snapshots before revealing. Dashboard sections slide farther and use a short stagger, while respecting reduced motion.
+
+
+## Repeat Scroll Reveal
+- Shared observer keeps sections registered and replays when they leave and return to view. An active animation cannot restart itself near a viewport edge.

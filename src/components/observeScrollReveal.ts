@@ -23,15 +23,21 @@ export function observeScrollReveal(root: HTMLElement) {
   }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const revealed = new WeakSet<Element>();
-  const playing = new Set<Animation>();
+  const inView = new WeakSet<Element>();
+  const playing = new Map<Element, Animation>();
   const observer = new IntersectionObserver(entries => {
     let dashboardDelay = 0;
     for (const { target, isIntersecting } of entries) {
-      if (!isIntersecting || !root.contains(target) || revealed.has(target)) continue;
-      observer.unobserve(target);
-      revealed.add(target);
-      if (reducedMotion.matches || target.contains(document.activeElement)) continue;
+      if (!root.contains(target)) continue;
+      if (!isIntersecting) {
+        inView.delete(target);
+        continue;
+      }
+      if (inView.has(target)) continue;
+      inView.add(target);
+
+      // Translation can briefly move a card across the viewport edge during playback.
+      if (playing.has(target) || reducedMotion.matches || target.contains(document.activeElement)) continue;
 
       const dashboard = target.closest('.clinic-overview');
       const delay = dashboard ? Math.min(dashboardDelay++ * 65, 260) : 0;
@@ -45,8 +51,10 @@ export function observeScrollReveal(root: HTMLElement) {
           easing: 'cubic-bezier(.2,.75,.25,1)',
         },
       );
-      playing.add(animation);
-      const forget = () => playing.delete(animation);
+      playing.set(target, animation);
+      const forget = () => {
+        if (playing.get(target) === animation) playing.delete(target);
+      };
       animation.finished.then(forget, forget);
     }
   }, { rootMargin: '0px 0px -16px 0px' });
@@ -57,7 +65,7 @@ export function observeScrollReveal(root: HTMLElement) {
   };
 
   const observe = (target: Element) => {
-    if (root.contains(target) && !revealed.has(target) && !target.closest(excluded) && !target.closest('[data-reveal-wait]')) {
+    if (root.contains(target) && !target.closest(excluded) && !target.closest('[data-reveal-wait]')) {
       observer.observe(target);
     }
   };
@@ -71,7 +79,12 @@ export function observeScrollReveal(root: HTMLElement) {
       record.removedNodes.forEach(node => {
         if (node instanceof Element) {
           visitTargets(node, target => {
-            if (!root.contains(target)) observer.unobserve(target);
+            if (!root.contains(target)) {
+              observer.unobserve(target);
+              inView.delete(target);
+              playing.get(target)?.cancel();
+              playing.delete(target);
+            }
           });
         }
       });
