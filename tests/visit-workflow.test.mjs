@@ -17,23 +17,24 @@ const patient={id:'p1',cn:'CN1',firstName:'Test',lastName:'Only'};
 const med={id:'m1',tradeName:'Test medicine',qtyToGive:2,sellingPrice:10,isService:false};
 await test('separate drafts, duplicate patient resumes same case, and stale writes rejected',async()=>{
  const a=await startCase(patient), b=await startCase({...patient,id:'p2',cn:'CN2'});
+ const episode=store.get('visits/'+a).episodeId;
  assert.notEqual(a,b);assert.equal(await startCase(patient),a);
- await saveCaseDraft(a,{chiefComplaint:'A',prescriptions:[]},0);
+ await saveCaseDraft(a,{chiefComplaint:'A',prescriptions:[]},0,episode);
  assert.equal(store.get('visits/'+a).chiefComplaint,'A');assert.equal(store.get('visits/'+b).chiefComplaint,'');
- await assert.rejects(saveCaseDraft(a,{chiefComplaint:'stale'},0),/อุปกรณ์อื่น/);
+ await assert.rejects(saveCaseDraft(a,{chiefComplaint:'stale'},0,episode),/อุปกรณ์อื่น/);
 });
 await test('exam does not change stock; shortage rolls back; dispense/payment happen once',async()=>{
  const id=await startCase({...patient,id:'p3'});store.set('pharmacy/m1',{stockQty:'1',expiryDate:'2099-01-01'});
- await saveCaseDraft(id,{chiefComplaint:'Test',diagnosis:'Test',prescriptions:[med]},0);
- await finishCase(id,'draft',1);assert.equal(store.get('pharmacy/m1').stockQty,'1');
- await assert.rejects(finishCase(id,'awaiting_medicine',2),/ไม่พอ/);
+ const episode=store.get('visits/'+id).episodeId;
+ await saveCaseDraft(id,{chiefComplaint:'Test',diagnosis:'Test',prescriptions:[med]},0,episode);
+ await finishCase(id,'draft',1,episode);assert.equal(store.get('pharmacy/m1').stockQty,'1');
+ await assert.rejects(finishCase(id,'awaiting_medicine',2,episode),/ไม่พอ/);
  assert.equal(store.get('visits/'+id).workflowStatus,'awaiting_medicine');assert.equal(store.get('pharmacy/m1').stockQty,'1');
  store.set('pharmacy/m1',{stockQty:'5',expiryDate:'2099-01-01'});
- await finishCase(id,'awaiting_medicine',2);assert.equal(store.get('pharmacy/m1').stockQty,'3');
- await assert.rejects(finishCase(id,'awaiting_medicine',2),/เปลี่ยนแปลง/);assert.equal(store.get('pharmacy/m1').stockQty,'3');
- const episode=store.get('visits/'+id).episodeId;
- await finishCase(id,'awaiting_payment',3);assert.equal(store.has('visits/'+id),false);assert.equal(store.get('visits/'+episode).paymentStatus,'paid');
- await assert.rejects(finishCase(id,'awaiting_payment',3),/ปิดแล้ว/);
+ await finishCase(id,'awaiting_medicine',2,episode);assert.equal(store.get('pharmacy/m1').stockQty,'3');
+ await assert.rejects(finishCase(id,'awaiting_medicine',2,episode),/เปลี่ยนแปลง/);assert.equal(store.get('pharmacy/m1').stockQty,'3');
+ await finishCase(id,'awaiting_payment',3,episode);assert.equal(store.has('visits/'+id),false);assert.equal(store.get('visits/'+episode).paymentStatus,'paid');
+ await assert.rejects(finishCase(id,'awaiting_payment',3,episode),/ปิดแล้ว/);
  const newId=await startCase({...patient,id:'p3'});assert.equal(newId,id);assert.notEqual(store.get('visits/'+newId).episodeId,episode);assert.ok(store.has('visits/'+episode));
 });
 await test('invalid quantities, negative prices, and duplicate items cannot be confirmed',()=>{

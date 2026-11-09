@@ -47,7 +47,7 @@ export async function saveCaseDraft(id: string, data: any, expectedRevision: num
     return revision;
   });
 }
-export async function finishCase(id: string, expectedStage: string, expectedRevision: number) {
+export async function finishCase(id: string, expectedStage: string, expectedRevision: number, episodeId: string) {
   return runTransaction(db, async tx => {
     const ref = doc(db,'visits',id); const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error('เคสนี้ปิดแล้ว กรุณาเปิดประวัติการตรวจ');
