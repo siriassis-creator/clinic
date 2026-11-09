@@ -124,3 +124,9 @@
 
 ## Card Lift menu transition
 - Navbar now fades and lifts the incoming page vertically, matching the direction of Scroll Reveal. The menu indicator and reduced-motion behavior are retained.
+
+
+## Dashboard and visit workflow updates
+- Dashboard displays unique patients and clinical visits for the selected month. Settings defines the expiry warning window (default 30 Bangkok calendar days), used by dashboard inventory and pharmacy badges.
+- Confirming cancellation of a pre-dispensing tab transactionally removes its draft. Dispensed and paid records are protected, and writes check episode IDs to avoid overwriting a newly reopened case.
+- Chronic conditions and drug allergies are displayed directly below patient CN and age.

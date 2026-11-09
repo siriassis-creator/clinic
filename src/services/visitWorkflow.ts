@@ -29,11 +29,12 @@ export async function startCase(patient: any) {
   });
   return ref.id;
 }
-export async function saveCaseDraft(id: string, data: any, expectedRevision: number) {
+export async function saveCaseDraft(id: string, data: any, expectedRevision: number, episodeId: string) {
   return runTransaction(db, async tx => {
     const ref = doc(db,'visits',id); const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error('ไม่พบเคส กรุณาโหลดหน้าใหม่');
     const current = snap.data();
+    if (current.episodeId !== episodeId) throw new Error('ฉบับร่างนี้ถูกยกเลิกแล้ว');
     if (current.ownerUid !== auth.currentUser?.uid || current.workflowStatus !== 'draft') throw new Error('เคสนี้เปลี่ยนสถานะแล้ว กรุณาโหลดหน้าใหม่');
     if (current.revision !== expectedRevision) throw new Error('เคสถูกแก้ไขจากอุปกรณ์อื่น กรุณาโหลดหน้าใหม่ก่อนทำต่อ');
     const fields = ['chiefComplaint','weight','height','temp','resp','pulse','bp','o2sat','diagnosis','treatment','nextAppt'];
@@ -51,6 +52,7 @@ export async function finishCase(id: string, expectedStage: string, expectedRevi
     const ref = doc(db,'visits',id); const snap = await tx.get(ref);
     if (!snap.exists()) throw new Error('เคสนี้ปิดแล้ว กรุณาเปิดประวัติการตรวจ');
     const data = snap.data();
+    if (data.episodeId !== episodeId) throw new Error('ฉบับร่างนี้ถูกยกเลิกแล้ว');
     if (data.ownerUid !== auth.currentUser?.uid) throw new Error('ไม่มีสิทธิ์จัดการเคสนี้');
     if (data.workflowStatus !== expectedStage || data.revision !== expectedRevision) throw new Error('เคสเปลี่ยนแปลงแล้ว กรุณาโหลดหน้าใหม่ ไม่ได้ทำรายการซ้ำ');
     const next = {draft:'awaiting_medicine',awaiting_medicine:'awaiting_payment',awaiting_payment:'paid'}[expectedStage];
@@ -84,5 +86,23 @@ export async function finishCase(id: string, expectedStage: string, expectedRevi
       tx.delete(ref);
     } else tx.update(ref,final);
     return {revision,stage:next};
+  });
+}
+
+export async function discardCase(id: string, episodeId: string) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  await runTransaction(db, async tx => {
+    const ref = doc(db, 'visits', id);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const current = snap.data();
+    if (current.ownerUid !== uid || current.episodeId !== episodeId) {
+      throw new Error('เคสเปลี่ยนแปลงแล้ว กรุณาตรวจสอบอีกครั้ง');
+    }
+    if (!['draft', 'awaiting_medicine'].includes(current.workflowStatus) || current.dispensedAt || current.paidAt) {
+      throw new Error('เคสนี้จ่ายยาหรือรับชำระแล้ว จึงยกเลิกจากแท็บไม่ได้');
+    }
+    tx.delete(ref);
   });
 }

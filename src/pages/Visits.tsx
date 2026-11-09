@@ -16,7 +16,7 @@ import { db, auth } from '../services/firebase';
 import BackButton from '../components/BackButton';
 import './Visits.css';
 import './VisitWorkspace.css';
-import { finishCase, saveCaseDraft, startCase, stageLabel } from '../services/visitWorkflow';
+import { discardCase, finishCase, saveCaseDraft, startCase, stageLabel } from '../services/visitWorkflow';
 
 const initialVisitState = {
   chiefComplaint: '',
@@ -34,7 +34,7 @@ const initialVisitState = {
   totalAmount: 0,
 };
 
-function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; seed: any }) {
+function PatientCase({ patient, caseId, seed, isDiscarding }: { patient: any; caseId: string; seed: any; isDiscarding: () => boolean }) {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'info' | 'history' | 'record'>(
     'record'
@@ -137,7 +137,8 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
   const persist = (data: any) => {
     setSaveState('กำลังเก็บฉบับร่าง...');
     const task = queue.current.then(async () => {
-      revision.current = await saveCaseDraft(caseId, data, revision.current);
+      if (isDiscarding()) return;
+      revision.current = await saveCaseDraft(caseId, data, revision.current, seed.episodeId);
       setSaveState('บันทึกฉบับร่างแล้ว');
     });
     queue.current = task.catch(() => {});
@@ -153,7 +154,7 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
     return () => clearTimeout(timer);
   }, [visitData, stage, editVisitId, conflict]);
   useEffect(() => () => {
-    if (stageRef.current === 'draft') void persist(latest.current).catch(() => {});
+    if (stageRef.current === 'draft' && !isDiscarding()) void persist(latest.current).catch(() => {});
   }, []);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -217,7 +218,7 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
   };
 
   const transition = async () => {
-    if (busy || conflict) return;
+    if (busy || conflict || isDiscarding()) return;
     if (stage === 'draft' && (!visitData.chiefComplaint || !visitData.diagnosis)) {
       alert('กรุณาระบุอาการสำคัญและการวินิจฉัย'); return;
     }
@@ -227,7 +228,7 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
     try {
       if (stage === 'draft') await persist(visitData);
       await queue.current;
-      const result = await finishCase(caseId, stage, revision.current);
+      const result = await finishCase(caseId, stage, revision.current, seed.episodeId);
       revision.current = result.revision;
       setStage(next);
       setSaveState(next === 'paid' ? 'รับชำระแล้ว' : 'บันทึกสถานะแล้ว');
@@ -258,6 +259,16 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
                 CN: <strong>{selectedPatient.cn}</strong> | อายุ:{' '}
                 {selectedPatient.age} ปี
               </p>
+              <dl className="patient-clinical-summary">
+                <div>
+                  <dt>โรคประจำตัว</dt>
+                  <dd>{selectedPatient.diseaseDetail?.trim() || (selectedPatient.hasUnderlyingDisease === 'มี' ? 'มี แต่ยังไม่ระบุรายละเอียด' : selectedPatient.hasUnderlyingDisease === 'ไม่มี' ? 'ไม่มี' : 'ยังไม่ระบุ')}</dd>
+                </div>
+                <div className="patient-allergy">
+                  <dt>⚠️ การแพ้ยา</dt>
+                  <dd>{selectedPatient.allergyDetail?.trim() || (selectedPatient.hasAllergy === 'มี' ? 'มี แต่ยังไม่ระบุรายละเอียด' : selectedPatient.hasAllergy === 'ไม่มี' ? 'ไม่มี' : 'ยังไม่ระบุ')}</dd>
+                </div>
+              </dl>
             </div>
             <div className="tab-row mt-4">
               <div className="tab-menu">
@@ -315,40 +326,6 @@ function PatientCase({ patient, caseId, seed }: { patient: any; caseId: string; 
                     <div className="reg-group flex-1">
                       <label>เบอร์โทรศัพท์</label>
                       <p>{selectedPatient.phone || '-'}</p>
-                    </div>
-                    <div
-                      className="reg-group flex-1"
-                      style={{
-                        background: '#fee2e2',
-                        padding: '10px',
-                        borderRadius: '8px',
-                      }}
-                    >
-                      <label style={{ color: '#dc2626' }}>⚠️ แพ้ยา</label>
-                      <p>
-                        <strong>
-                          {selectedPatient.hasAllergy === 'มี'
-                            ? selectedPatient.allergyDetail
-                            : 'ไม่มี'}
-                        </strong>
-                      </p>
-                    </div>
-                    <div
-                      className="reg-group flex-1"
-                      style={{
-                        background: '#fff7ed',
-                        padding: '10px',
-                        borderRadius: '8px',
-                      }}
-                    >
-                      <label style={{ color: '#ea580c' }}>🩺 โรคประจำตัว</label>
-                      <p>
-                        <strong>
-                          {selectedPatient.hasUnderlyingDisease === 'มี'
-                            ? selectedPatient.diseaseDetail
-                            : 'ไม่มี'}
-                        </strong>
-                      </p>
                     </div>
                   </div>
                   <div className="reg-group mt-3">
@@ -1518,7 +1495,8 @@ export default function Visits() {
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [closing, setClosing] = useState('');
+  const discarding = useRef(new Set<string>());
   useEffect(() => onSnapshot(collection(db, 'patients'), snap => setPatients(snap.docs.map(d => ({id:d.id,...d.data()}))), e => setError(e.message)), []);
   useEffect(() => onSnapshot(query(collection(db, 'visits'), where('ownerUid', '==', auth.currentUser?.uid || '')), snap => {
     const rows = snap.docs.map(d => ({id:d.id,...d.data()} as any)).filter(v => ['draft','awaiting_medicine','awaiting_payment'].includes(v.workflowStatus));
@@ -1527,12 +1505,33 @@ export default function Visits() {
   const open = async (patient: any) => {
     if (opening) return;
     setOpening(true); setError('');
-    try { const id = await startCase(patient); setHidden(h => h.filter(x => x !== id)); setActive(id); setSearch(''); }
+    try { const id = await startCase(patient); setActive(id); setSearch(''); }
     catch(e:any) { setError('เปิดเคสไม่สำเร็จ: '+e.message); }
     finally {setOpening(false);}
   };
   useEffect(() => { if (location.state?.patient) void open(location.state.patient); }, [location.key]);
-  const visible = cases.filter(c => !hidden.includes(c.id));
+  const closeCase = async (visit: { id: string; episodeId: string; workflowStatus: string }) => {
+    if (closing || discarding.current.has(visit.episodeId)) return;
+    if (visit.workflowStatus === 'awaiting_payment') {
+      setError('เคสนี้จ่ายยาแล้ว จึงยกเลิกจากแท็บไม่ได้ กรุณาดำเนินการรับชำระในเคสเดิม');
+      return;
+    }
+    if (!window.confirm('ยกเลิกเคสนี้และลบฉบับร่างทั้งหมด? ข้อมูลการตรวจในแท็บนี้จะไม่ถูกเก็บไว้')) return;
+
+    discarding.current.add(visit.episodeId);
+    setClosing(visit.id);
+    setError('');
+    try {
+      await discardCase(visit.id, visit.episodeId);
+      setCases(rows => rows.filter(row => row.episodeId !== visit.episodeId));
+    } catch (e: any) {
+      discarding.current.delete(visit.episodeId);
+      setError('ยกเลิกเคสไม่สำเร็จ: ' + e.message);
+    } finally {
+      setClosing('');
+    }
+  };
+  const visible = cases;
   const selected = visible.some(c => c.id === active) ? active : visible[0]?.id;
   return <div className="visit-workspace">
     <BackButton />
@@ -1541,14 +1540,13 @@ export default function Visits() {
     <div className="workspace-search"><input aria-label="ค้นหาผู้ป่วยเพื่อเปิดแท็บ" placeholder="+ เปิดผู้ป่วยเพิ่ม — ชื่อ หรือ CN" value={search} onChange={e=>setSearch(e.target.value)} />
       {search && <div className="workspace-results">{patients.filter(p => `${p.firstName} ${p.lastName} ${p.cn}`.toLowerCase().includes(search.toLowerCase())).slice(0,8).map(p => <button key={p.id} disabled={opening} onClick={()=>open(p)}>{p.firstName} {p.lastName} · {p.cn}</button>)}</div>}
     </div>
-    {hidden.length > 0 && <button onClick={()=>setHidden([])}>เปิดฉบับร่างที่ซ่อนไว้ ({hidden.length})</button>}
     <div className="patient-case-tabs" role="tablist" aria-label="เคสผู้ป่วยที่เปิดอยู่">{visible.map(c => <div className="patient-case-tab" key={c.id}>
       <button role="tab" id={'tab-'+c.id} aria-selected={selected===c.id} aria-controls={'panel-'+c.id} onClick={()=>setActive(c.id)}>{c.patientName}<small>{c.cn} · {stageLabel(c.workflowStatus)}</small></button>
-      <button aria-label={'ซ่อนแท็บ '+c.patientName} onClick={()=>{if(window.confirm('ซ่อนแท็บนี้? ฉบับร่างที่บันทึกแล้วจะยังอยู่ เปิดกลับได้'))setHidden(h=>[...h,c.id]);}}>×</button>
+      <button type="button" aria-label={'ยกเลิกเคส '+c.patientName} disabled={Boolean(closing)} onClick={()=>void closeCase(c)}>×</button>
     </div>)}</div>
     {!visible.length && <p className="workspace-empty">ค้นหาผู้ป่วยเพื่อเริ่มตรวจ หรือเปิดฉบับร่างเดิมกลับมาทำต่อ</p>}
-    {visible.map(c => <section key={c.id} role="tabpanel" id={'panel-'+c.id} aria-labelledby={'tab-'+c.id} hidden={selected!==c.id}>
-      <PatientCase patient={patients.find(p=>p.id===c.patientId)||{...c.patientSnapshot,id:c.patientId,cn:c.cn}} caseId={c.id} seed={c} />
+    {visible.map(c => <section key={c.episodeId || c.id} role="tabpanel" id={'panel-'+c.id} aria-labelledby={'tab-'+c.id} hidden={selected!==c.id}>
+      <PatientCase patient={patients.find(p=>p.id===c.patientId)||{...c.patientSnapshot,id:c.patientId,cn:c.cn}} caseId={c.id} seed={c} isDiscarding={()=>discarding.current.has(c.episodeId)} />
     </section>)}
   </div>;
 }

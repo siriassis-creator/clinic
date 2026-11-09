@@ -5,13 +5,14 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieCh
 import { db, auth } from '../services/firebase';
 import { buildDashboard, bangkokDate } from '../services/dashboardSummary';
 import './Dashboard.css';
+import { expiryWarningDays, DEFAULT_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
 import PatientAvatar from '../components/PatientAvatar';
 import { patientIndex } from '../services/patientAvatar';
 
 type Row = Record<string, any>;
 const money = (n:number) => n.toLocaleString('th-TH',{maximumFractionDigits:2});
 const number = (n:number) => n.toLocaleString('th-TH');
-const colors = ['#2ab59a','#f3b94e','#f07179'];
+const colors = ['#2ab59a','#f3b94e','#f07179','#f59e0b'];
 function Empty({text='ยังไม่มีข้อมูลในช่วงนี้'}:{text?:string}) {return <div className="overview-empty">{text}</div>;}
 function PanelStatus({state, empty}: {state: string; empty?: string}) {
   return <Empty text={state === 'loading' ? 'กำลังโหลด...' : state === 'error' ? 'ไม่สามารถแสดงข้อมูล' : empty}/>;
@@ -24,15 +25,16 @@ export default function Dashboard() {
   const [loaded,setLoaded]=useState<Record<string,boolean>>({});
   const [errors,setErrors]=useState<Record<string,string>>({});
   const [month,setMonth]=useState(()=>bangkokDate(new Date()).slice(0,7));
+  const [warningDays, setWarningDays] = useState(DEFAULT_EXPIRY_WARNING_DAYS);
   const [search,setSearch]=useState('');
   useEffect(()=>{
     const stop=['patients','visits','pharmacy','medicine_history'].map(name=>onSnapshot(collection(db,name),snap=>{
       setData(prev=>({...prev,[name]:snap.docs.map(d=>({id:d.id,...d.data()}))}));setLoaded(prev=>({...prev,[name]:true}));setErrors(prev=>({...prev,[name]:''}));
     },error=>{setLoaded(prev=>({...prev,[name]:true}));setErrors(prev=>({...prev,[name]:error.message}));}));
-    stop.push(onSnapshot(doc(db,'settings','appointment'),snap=>{if(snap.exists())setClinic({name:snap.data().clinicName||'เอื้องฟ้าคลินิก',subtitle:snap.data().clinicSubtitle||'การพยาบาลและการผดุงครรภ์'});}));
+    stop.push(onSnapshot(doc(db,'settings','appointment'),snap=>{setWarningDays(expiryWarningDays(snap.data()?.expiryWarningDays));if(snap.exists())setClinic({name:snap.data().clinicName||'เอื้องฟ้าคลินิก',subtitle:snap.data().clinicSubtitle||'การพยาบาลและการผดุงครรภ์'});}));
     return ()=>stop.forEach(fn=>fn());
   },[]);
-  const summary=useMemo(()=>buildDashboard(data,month,new Date(),auth.currentUser?.uid),[data,month]);
+  const summary=useMemo(()=>buildDashboard(data,month,new Date(),auth.currentUser?.uid,warningDays),[data,month,warningDays]);
   const failed=Object.values(errors).some(Boolean);
   const status = (...collections: string[]) => {
     if (collections.some(name => errors[name])) return 'error';
@@ -48,9 +50,9 @@ export default function Dashboard() {
   const openPatient=(p:Row)=>navigate('/visits',{state:{patient:p}});
   const stats=[
     {icon:'👥',label:'ผู้ป่วยทั้งหมด',value:number(data.patients.length),unit:'คน',detail:'ทะเบียนผู้ป่วย',path:'/register',tone:'blue',state:patientsStatus},
-    {icon:'🩺',label:'ตรวจรักษาเดือนนี้',value:number(summary.monthClinical.length),unit:'ครั้ง',detail:'ไม่รวมฉบับร่าง / ขายยาหน้าร้าน',path:'/visits',tone:'green',state:visitsStatus},
+    {icon:'🩺',label:'ตรวจรักษาเดือนนี้',value:number(summary.monthClinical.length),unit:'ครั้ง',people:number(summary.monthPatientCount),detail:'ไม่รวมฉบับร่าง / ขายยาหน้าร้าน',path:'/visits',tone:'green',state:visitsStatus},
     {icon:'📅',label:'นัดหมายวันนี้',value:number(summary.appointments.length),unit:'รายการ',detail:'นัดที่ยังไม่ติดตาม',path:'/appointments',tone:'purple',state:visitsStatus},
-    {icon:'📦',label:'ยาและเวชภัณฑ์',value:number(data.pharmacy.length),unit:'รายการ',detail:`สต็อกต่ำ ${summary.low.length} · หมดอายุ ${summary.expired.length}`,path:'/pharmacy',tone:'amber',state:stockStatus},
+    {icon:'📦',label:'ยาและเวชภัณฑ์',value:number(data.pharmacy.length),unit:'รายการ',detail:`สต็อกต่ำ ${summary.low.length} · ใกล้หมดอายุ ${summary.expiring.length} · หมดอายุ ${summary.expired.length}`,path:'/pharmacy',tone:'amber',state:stockStatus},
     {icon:'฿',label:'รายรับเดือนนี้',value:'฿ '+money(summary.income),unit:'',detail:'รับชำระแล้ว รวมขายหน้าร้าน',path:'/reports',tone:'blue',state:visitsStatus},
     {icon:'↗',label:'มูลค่ารับยาเข้าเดือนนี้',value:'฿ '+money(summary.expense),unit:'',detail:'ประมาณจากราคาทุนปัจจุบัน',path:'/reports',tone:'rose',state:status('pharmacy', 'medicine_history')},
   ];
@@ -62,7 +64,7 @@ export default function Dashboard() {
     </section>
     <div className="overview-toolbar"><div><h2>ภาพรวมการบริหารจัดการ</h2><span>{new Date().toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'long',year:'numeric'})}</span></div><div className="overview-tools"><div className="overview-search"><input aria-label="ค้นหาผู้ป่วย" placeholder="ค้นหาชื่อผู้ป่วย หรือ CN..." value={search} onChange={e=>setSearch(e.target.value)}/>{search.trim()&&<div className="overview-results">{found.length?found.map(p=><button key={p.id} onClick={()=>openPatient(p)}>{p.firstName} {p.lastName}<small>{p.cn}</small></button>):<p>ไม่พบผู้ป่วย</p>}</div>}</div><input type="month" aria-label="เดือนที่แสดงข้อมูล" value={month} onChange={e=>{if(e.target.value)setMonth(e.target.value);}}/><button className="overview-logout" onClick={()=>{if(window.confirm('ออกจากระบบ?'))void auth.signOut();}}>ออกจากระบบ</button></div></div>
     {failed&&<p className="overview-error" role="alert">โหลดข้อมูลสรุปไม่ครบ กรุณาตรวจสิทธิ์หรือเชื่อมต่อใหม่ — {Object.entries(errors).filter(([,v])=>v).map(([k])=>k).join(', ')}</p>}
-    <section className="overview-stats" aria-label="ตัวเลขสรุป">{stats.map(s=><button key={s.label} className="overview-stat" onClick={()=>navigate(s.path)}><span className={'stat-icon '+s.tone}>{s.icon}</span><div><span className="stat-label">{s.label.replace('เดือนนี้',month===bangkokDate(new Date()).slice(0,7)?'เดือนนี้':'เดือนที่เลือก')}</span><strong>{s.state==='ready'?s.value:'—'} <small>{s.unit}</small></strong></div><p>{s.state==='loading'?'กำลังโหลดข้อมูล...':s.state==='error'?'ข้อมูลยังไม่พร้อม':s.detail}</p></button>)}</section>
+    <section className="overview-stats" aria-label="ตัวเลขสรุป">{stats.map(s=><button key={s.label} className="overview-stat" onClick={()=>navigate(s.path)}><span className={'stat-icon '+s.tone}>{s.icon}</span><div><span className="stat-label">{s.label.replace('เดือนนี้',month===bangkokDate(new Date()).slice(0,7)?'เดือนนี้':'เดือนที่เลือก')}</span>{s.people !== undefined && <strong>{s.state==='ready'?s.people:'—'} <small>คน</small></strong>}<strong>{s.state==='ready'?s.value:'—'} <small>{s.unit}</small></strong></div><p>{s.state==='loading'?'กำลังโหลดข้อมูล...':s.state==='error'?'ข้อมูลยังไม่พร้อม':s.detail}</p></button>)}</section>
     <div className="overview-grid">
       <section className="overview-panel appointments"><div className="panel-heading"><h3>นัดหมายวันนี้</h3><button onClick={()=>navigate('/appointments')}>ดูทั้งหมด ↗</button></div>{visitsStatus==='ready'?(summary.appointments.length?<div className="overview-list">{summary.appointments.slice(0,5).map(v=><button key={v.id} onClick={()=>navigate('/appointments')}><PatientAvatar patient={patientForVisit(v)}/><span><strong>{v.patientName||'ไม่ระบุชื่อ'}</strong><small>{v.cn||'—'} · ยังไม่ติดตาม</small></span><span className="list-badge amber">วันนี้</span></button>)}</div>:<Empty text="วันนี้ไม่มีนัดที่รอติดตาม"/>):<PanelStatus state={visitsStatus}/>}</section>
       <section className="overview-panel trend"><div className="panel-heading"><h3>สถิติการรักษา</h3><span>7 วันล่าสุด</span></div>{trendStatus==='ready'?<div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={summary.week} margin={{top:12,right:12,left:-25,bottom:0}}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e6edf5"/><XAxis dataKey="label" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend iconType="circle"/><Area isAnimationActive={false} type="monotone" dataKey="visits" name="การรักษา" stroke="#2389d7" fill="#2389d7" fillOpacity={.08} strokeWidth={2}/><Area isAnimationActive={false} type="monotone" dataKey="patients" name="ผู้ป่วยใหม่" stroke="#2ab59a" fill="#2ab59a" fillOpacity={.04} strokeWidth={2}/></AreaChart></ResponsiveContainer></div>:<PanelStatus state={trendStatus}/>}</section>
