@@ -27,25 +27,26 @@ export function observeScrollReveal(root: HTMLElement) {
   const playing = new Map<Element, Animation>();
   const observer = new IntersectionObserver(entries => {
     let dashboardDelay = 0;
-    for (const { target, isIntersecting } of entries) {
+    for (const { target, isIntersecting, intersectionRatio } of entries) {
       if (!root.contains(target)) continue;
-      if (!isIntersecting) {
+      const dashboard = target.closest('.clinic-overview');
+      if (!isIntersecting || (dashboard && intersectionRatio < 0.01)) {
         inView.delete(target);
         continue;
       }
-      if (inView.has(target)) continue;
+      // Wait until the card is visibly inside the viewport, above the bottom bar.
+      if ((dashboard && intersectionRatio < 0.15) || inView.has(target)) continue;
       inView.add(target);
 
       // Translation can briefly move a card across the viewport edge during playback.
       if (playing.has(target) || reducedMotion.matches || target.contains(document.activeElement)) continue;
 
-      const dashboard = target.closest('.clinic-overview');
-      const delay = dashboard ? Math.min(dashboardDelay++ * 65, 260) : 0;
+      const delay = dashboard ? Math.min(dashboardDelay++ * 80, 320) : 0;
       const animation = target.animate(
-        [{ opacity: dashboard ? 0 : 0.35, translate: dashboard ? '0 34px' : '0 18px' },
-          { opacity: 1, translate: '0 0' }],
+        [{ opacity: dashboard ? 0 : 0.35, transform: dashboard ? 'translateY(38px)' : 'translateY(18px)' },
+          { opacity: 1, transform: 'translateY(0)' }],
         {
-          duration: dashboard ? 650 : 420,
+          duration: dashboard ? 740 : 420,
           delay,
           fill: 'backwards',
           easing: 'cubic-bezier(.2,.75,.25,1)',
@@ -57,7 +58,7 @@ export function observeScrollReveal(root: HTMLElement) {
       };
       animation.finished.then(forget, forget);
     }
-  }, { rootMargin: '0px 0px -16px 0px' });
+  }, { rootMargin: '0px 0px -72px 0px', threshold: [0, 0.01, 0.15] });
 
   const visitTargets = (element: Element, visit: (target: Element) => void) => {
     if (element.matches(revealTargets)) visit(element);

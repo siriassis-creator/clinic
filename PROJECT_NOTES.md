@@ -106,3 +106,8 @@
 ## Dashboard loading and card reveal
 - Dashboard cards and chart panels reveal on viewport entry independently of Firestore loading. Each panel renders when its own collections are available, with loading and error states.
 - Dashboard charts use the shared card reveal instead of running a second chart animation on data updates.
+
+
+## Dashboard reveal visibility
+- Dashboard reveal starts at 15% visibility above the bottom menu, and resets below 1% to handle viewport edge contact. Uses transform-based animation.
+- Browser fixture confirmed the overview heading, summary card, and chart panels replay after leaving and re-entering the viewport.
