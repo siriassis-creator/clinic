@@ -65,17 +65,13 @@ export function observeScrollReveal(root: HTMLElement) {
   };
 
   const observe = (target: Element) => {
-    if (root.contains(target) && !target.closest(excluded) && !target.closest('[data-reveal-wait]')) {
+    if (root.contains(target) && !target.closest(excluded)) {
       observer.observe(target);
     }
   };
 
   const changes = new MutationObserver(records => {
     for (const record of records) {
-      if (record.type === 'attributes' && record.target instanceof Element) {
-        visitTargets(record.target, observe);
-        continue;
-      }
       record.removedNodes.forEach(node => {
         if (node instanceof Element) {
           visitTargets(node, target => {
@@ -94,7 +90,7 @@ export function observeScrollReveal(root: HTMLElement) {
     }
   });
   visitTargets(root, observe);
-  changes.observe(root, { childList: true, subtree: true, attributeFilter: ['data-reveal-wait'] });
+  changes.observe(root, { childList: true, subtree: true });
 
   const stopMotion = () => {
     if (reducedMotion.matches) playing.forEach(animation => animation.cancel());

@@ -101,3 +101,8 @@
 
 ## Repeat Scroll Reveal
 - Shared observer keeps sections registered and replays when they leave and return to view. An active animation cannot restart itself near a viewport edge.
+
+
+## Dashboard loading and card reveal
+- Dashboard cards and chart panels reveal on viewport entry independently of Firestore loading. Each panel renders when its own collections are available, with loading and error states.
+- Dashboard charts use the shared card reveal instead of running a second chart animation on data updates.
