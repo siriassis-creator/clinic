@@ -88,3 +88,8 @@
 ## 2026-11-09 — Dashboard card order
 - Dashboard.tsx replaces the former inventory slot with today's registrations and moves the inventory chart into the former alerts slot.
 - dashboardSummary.ts filters today's registrations by Bangkok date, independently of the month filter. Existing recent registrations and inventory totals are retained.
+
+
+## 2026-11-09 — Scroll Reveal
+- App.tsx connects a shared viewport observer for all routes, including login.
+- observeScrollReveal.ts animates content sections once on entry, handles dynamically mounted sections, excludes dialogs and honors reduced motion.
