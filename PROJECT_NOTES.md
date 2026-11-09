@@ -111,3 +111,8 @@
 ## Dashboard reveal visibility
 - Dashboard reveal starts at 15% visibility above the bottom menu, and resets below 1% to handle viewport edge contact. Uses transform-based animation.
 - Browser fixture confirmed the overview heading, summary card, and chart panels replay after leaving and re-entering the viewport.
+
+
+## Directional menu transition
+- Navbar animates the incoming route from the side matching menu order and slides a blue indicator along the bottom nav. Reduced-motion preference disables movement.
+- App passes the page container to Navbar so the fixed navigation stays in place.

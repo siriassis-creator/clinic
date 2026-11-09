@@ -90,7 +90,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </div>
-      {user && <Navbar />}
+      {user && <Navbar contentRef={contentRef} />}
     </Router>
   );
 }

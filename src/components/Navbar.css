@@ -42,3 +42,22 @@
   .clinic-bottom-nav { justify-content: space-between; padding-left: 2px; padding-right: 2px; }
   .clinic-bottom-item { flex: 1 1 0; min-width: 0; min-height: 54px; padding: 4px 1px; flex-direction: column; gap: 4px; font-size: 11px; }
 }
+
+/* Keep the sliding page within the viewport without affecting vertical scroll. */
+html:has(.clinic-bottom-nav) { overflow-x: clip; }
+
+.clinic-menu-indicator {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: #3183d5;
+  pointer-events: none;
+  transition: transform 240ms ease, width 240ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clinic-menu-indicator { transition: none; }
+}
