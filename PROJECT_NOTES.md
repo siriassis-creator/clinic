@@ -83,3 +83,8 @@
 - Replaced small nurse beside clinic name with one full-height nurse in the approved position. Enlarged medical cross as faint watermark behind nurse. Removed PATIENT CARE text and decorative line.
 - Preserved clinic copy, four feature cards and bottom navigation. Responsive art sizing for tablet/mobile; no database or workflow changes.
 - Validation: TypeScript/Vite production build; production deployment to Kitti's Clinic project requested.
+
+
+## 2026-11-09 — Dashboard card order
+- Dashboard.tsx replaces the former inventory slot with today's registrations and moves the inventory chart into the former alerts slot.
+- dashboardSummary.ts filters today's registrations by Bangkok date, independently of the month filter. Existing recent registrations and inventory totals are retained.
