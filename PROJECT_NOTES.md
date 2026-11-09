@@ -120,3 +120,7 @@
 
 ## Patient page stacking
 - fullscreen.css isolates page content below the fixed bottom navigation, including the high-z-index address suggestions. Native dialogs retain their top-layer behavior.
+
+
+## Card Lift menu transition
+- Navbar now fades and lifts the incoming page vertically, matching the direction of Scroll Reveal. The menu indicator and reduced-motion behavior are retained.

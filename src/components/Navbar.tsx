@@ -50,8 +50,11 @@ export default function Navbar({ contentRef }: { contentRef: RefObject<HTMLDivEl
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     const animation = content && typeof content.animate === 'function' && from >= 0 && to >= 0 && from !== to && !reduced.matches
       ? content.animate(
-          [{ transform: 'translateX(' + (to > from ? '100%' : '-100%') + ')' }, { transform: 'none' }],
-          { duration: 290, easing: 'cubic-bezier(.2,.75,.25,1)' },
+          [
+            { opacity: 0.35, transform: 'translateY(20px)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          { duration: 280, easing: 'cubic-bezier(.2,.75,.25,1)' },
         )
       : undefined;
     const stopMotion = () => {
