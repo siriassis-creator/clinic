@@ -93,3 +93,7 @@
 ## 2026-11-09 — Scroll Reveal
 - App.tsx connects a shared viewport observer for all routes, including login.
 - observeScrollReveal.ts animates content sections once on entry, handles dynamically mounted sections, excludes dialogs and honors reduced motion.
+
+
+## Dashboard reveal timing
+- Dashboard cards wait for the initial data snapshots before revealing. Dashboard sections slide farther and use a short stagger, while respecting reduced motion.
