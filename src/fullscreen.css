@@ -1,7 +1,8 @@
 /* Shared page canvas. Dialogs and popovers retain their own readable sizing. */
 html, body, #root { width: 100%; min-height: 100%; margin: 0; }
 #root { min-height: 100dvh; }
-.clinic-app-content { --clinic-nav-clearance: calc(90px + env(safe-area-inset-bottom, 0px)); width: 100%; min-height: 100dvh; box-sizing: border-box; padding-bottom: var(--clinic-nav-clearance); }
+/* Keep page dropdowns below the fixed navigation. Native dialogs use the top layer. */
+.clinic-app-content { isolation: isolate; --clinic-nav-clearance: calc(90px + env(safe-area-inset-bottom, 0px)); width: 100%; min-height: 100dvh; box-sizing: border-box; padding-bottom: var(--clinic-nav-clearance); }
 .clinic-app-content > :is(.reg-container, .report-page-full, .dashboard-container, .visit-workspace, .v-full-screen) {
   width: 100%; max-width: none; margin: 0; box-sizing: border-box;
   min-height: calc(100dvh - var(--clinic-nav-clearance));

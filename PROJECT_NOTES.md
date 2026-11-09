@@ -116,3 +116,7 @@
 ## Directional menu transition
 - Navbar animates the incoming route from the side matching menu order and slides a blue indicator along the bottom nav. Reduced-motion preference disables movement.
 - App passes the page container to Navbar so the fixed navigation stays in place.
+
+
+## Patient page stacking
+- fullscreen.css isolates page content below the fixed bottom navigation, including the high-z-index address suggestions. Native dialogs retain their top-layer behavior.
