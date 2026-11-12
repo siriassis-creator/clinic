@@ -118,9 +118,7 @@ export default function Reports() {
         ...(d.data() as any),
       }));
 
-      const monthVisits = allVisits.filter(
-        (v) => v.visitDate && v.visitDate.includes(selectedMonth)
-      );
+      const monthVisits = allVisits.filter(v => !v.workflowStatus || v.workflowStatus === 'paid').map(v => ({...v, visitDate: v.paidAt || v.visitDate})).filter(v => v.visitDate && v.visitDate.includes(selectedMonth));
       const monthHistory = allHistory.filter(
         (h) =>
           h.timestamp && h.timestamp.includes(selectedMonth) && h.type === 'IN'
@@ -130,6 +128,7 @@ export default function Reports() {
       setTotalAppts(
         allVisits.filter(
           (v) =>
+            v.workflowStatus !== 'draft' &&
             v.nextAppt &&
             v.nextAppt >= todayStr &&
             (!v.followUpStatus || v.followUpStatus === '')

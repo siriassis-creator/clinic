@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -19,6 +19,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import PharmacySales from './pages/PharmacySales';
 import Navbar from './components/Navbar';
+import { observeScrollReveal } from './components/observeScrollReveal';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -32,11 +33,16 @@ export default function App() {
     return unsub;
   }, []);
 
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loading && contentRef.current) return observeScrollReveal(contentRef.current);
+  }, [loading]);
+
   if (loading) return <div className="loading-screen">กำลังโหลดระบบ...</div>;
 
   return (
     <Router>
-      <div className={user ? "clinic-app-content" : undefined}>
+      <div ref={contentRef} className={user ? "clinic-app-content" : undefined}>
       <Routes>
         {/* หน้า Login: ถ้าล็อกอินแล้วให้เด้งไปหน้าแรกเลย */}
         <Route
@@ -84,7 +90,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       </div>
-      {user && <Navbar />}
+      {user && <Navbar contentRef={contentRef} />}
     </Router>
   );
 }

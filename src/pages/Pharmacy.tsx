@@ -15,6 +15,8 @@ import { db } from '../services/firebase';
 import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import './Pharmacy.css';
+import { bangkokDate } from '../services/dashboardSummary';
+import { expiryWarningDays, medicineExpiryStatus, DEFAULT_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
 
 const initialFormState = {
   tradeName: '',
@@ -53,6 +55,11 @@ const years = Array.from({ length: 15 }, (_, i) =>
 
 export default function Pharmacy() {
   const navigate = useNavigate();
+  const [warningDays, setWarningDays] = useState(DEFAULT_EXPIRY_WARNING_DAYS);
+  useEffect(() => onSnapshot(doc(db, 'settings', 'appointment'), snap => {
+    setWarningDays(expiryWarningDays(snap.data()?.expiryWarningDays));
+  }, error => console.error('Unable to load expiry warning settings', error)), []);
+  const today = bangkokDate(new Date());
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [medicineList, setMedicineList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -678,11 +685,14 @@ export default function Pharmacy() {
                   <tr>
                     <th>ชื่อยา</th>
                     <th>คงเหลือ</th>
+                    <th>วันหมดอายุ</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayList.map((m) => (
+                  {displayList.map((m) => {
+                    const expiryStatus = medicineExpiryStatus(m.expiryDate, today, warningDays);
+                    return (
                     <tr key={m.id}>
                       <td>
                         <strong>{m.tradeName}</strong>
@@ -701,6 +711,11 @@ export default function Pharmacy() {
                         >
                           {m.stockQty} {m.unit}
                         </span>
+                      </td>
+                      <td>
+                        {expiryStatus === 'unknown' ? '—' : new Date(m.expiryDate + 'T12:00:00+07:00').toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}
+                        {expiryStatus === 'expired' && <div><span className="badge badge-red">หมดอายุ</span></div>}
+                        {expiryStatus === 'expiring' && <div><span className="badge badge-orange">ใกล้หมดอายุ</span></div>}
                       </td>
                       <td>
                         <button
@@ -737,7 +752,8 @@ export default function Pharmacy() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {displayList.length === 0 && (
