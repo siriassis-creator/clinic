@@ -135,3 +135,7 @@
 ## Dashboard refresh controls
 - Dashboard uses one-shot server reads only on refresh or an opted-in page entry. The last successful snapshot stays in memory across route changes and is cleared on account change/sign-out. Only the toggle preference is stored locally.
 - Refresh failures preserve prior data and its Bangkok timestamp. Concurrent refreshes share one request.
+
+
+## Dashboard toggle styling
+- Style the existing auto-refresh switch with an animated thumb, visible keyboard focus and reduced-motion support.

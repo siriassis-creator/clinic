@@ -26,7 +26,47 @@
   font-size: 13px;
 }
 .overview-refresh label { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
-.overview-refresh input { accent-color: #246aaa; }
+.overview-refresh input[role="switch"] {
+  appearance: none;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  position: relative;
+  border: 1px solid #64748b;
+  border-radius: 999px;
+  background: #64748b;
+  cursor: pointer;
+  transition: background-color 160ms, border-color 160ms;
+}
+.overview-refresh input[role="switch"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 25%);
+  transition: transform 160ms ease;
+}
+.overview-refresh input[role="switch"]:checked {
+  background: #19558e;
+  border-color: #19558e;
+}
+.overview-refresh input[role="switch"]:checked::before { transform: translateX(18px); }
+.overview-refresh input[role="switch"]:focus-visible { outline: 2px solid #19558e; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .overview-refresh input[role="switch"],
+  .overview-refresh input[role="switch"]::before { transition: none; }
+}
+@media (forced-colors: active) {
+  .overview-refresh input[role="switch"] { appearance: auto; }
+  .overview-refresh input[role="switch"]::before { content: none; }
+}
 .overview-refresh button {
   min-height: 44px;
   padding: 6px 14px;
