@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './services/firebase';
+import { resetDashboardSnapshot } from './services/dashboardSnapshot';
 
 // Import หน้าต่างๆ ของคุณ
 import Login from './pages/Login';
@@ -27,6 +28,7 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
+      resetDashboardSnapshot(currentUser?.uid);
       setUser(currentUser);
       setLoading(false);
     });

@@ -130,3 +130,8 @@
 - Dashboard displays unique patients and clinical visits for the selected month. Settings defines the expiry warning window (default 30 Bangkok calendar days), used by dashboard inventory and pharmacy badges.
 - Confirming cancellation of a pre-dispensing tab transactionally removes its draft. Dispensed and paid records are protected, and writes check episode IDs to avoid overwriting a newly reopened case.
 - Chronic conditions and drug allergies are displayed directly below patient CN and age.
+
+
+## Dashboard refresh controls
+- Dashboard uses one-shot server reads only on refresh or an opted-in page entry. The last successful snapshot stays in memory across route changes and is cleared on account change/sign-out. Only the toggle preference is stored locally.
+- Refresh failures preserve prior data and its Bangkok timestamp. Concurrent refreshes share one request.
