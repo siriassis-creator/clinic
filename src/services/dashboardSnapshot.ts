@@ -6,6 +6,8 @@ import { expiryWarningDays } from './medicineExpiry';
 const collections = ['patients', 'visits', 'pharmacy', 'medicine_history'] as const;
 
 async function readSnapshot() {
+  const configTask = getDocFromServer(doc(db, 'settings', 'appointment'));
+  void configTask.catch(() => {});
   const rows = await Promise.allSettled(collections.map(async name => {
     const result = await getDocsFromServer(collection(db, name));
     return [name, result.docs.map(row => ({ ...row.data(), id: row.id }))] as const;
@@ -14,7 +16,7 @@ async function readSnapshot() {
     if (result.status === 'rejected') throw result.reason;
     return result.value;
   }));
-  const config = (await getDocFromServer(doc(db, 'settings', 'appointment'))).data();
+  const config = (await configTask).data();
   return {
     data,
     clinic: {
