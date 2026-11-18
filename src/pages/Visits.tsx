@@ -1497,11 +1497,12 @@ export default function Visits() {
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
   const [closing, setClosing] = useState('');
+  const [closeTarget, setCloseTarget] = useState<any>(null);
   const discarding = useRef(new Set<string>());
   useEffect(() => onSnapshot(collection(db, 'patients'), snap => setPatients(snap.docs.map(d => ({id:d.id,...d.data()}))), e => setError(e.message)), []);
   useEffect(() => onSnapshot(query(collection(db, 'visits'), where('ownerUid', '==', auth.currentUser?.uid || '')), snap => {
     const rows = snap.docs.map(d => ({id:d.id,...d.data()} as any)).filter(v => ['draft','awaiting_medicine','awaiting_payment'].includes(v.workflowStatus));
-    setCases(rows);
+    setCases(rows.filter(row => !discarding.current.has(row.episodeId)));
   }, e => setError('ไม่สามารถโหลดฉบับร่าง: '+e.message)), []);
   const open = async (patient: any) => {
     if (opening) return;
@@ -1517,7 +1518,7 @@ export default function Visits() {
       setError('เคสนี้จ่ายยาแล้ว จึงยกเลิกจากแท็บไม่ได้ กรุณาดำเนินการรับชำระในเคสเดิม');
       return;
     }
-    if (!window.confirm('ยกเลิกเคสนี้และลบฉบับร่างทั้งหมด? ข้อมูลการตรวจในแท็บนี้จะไม่ถูกเก็บไว้')) return;
+    setCloseTarget(null);
 
     discarding.current.add(visit.episodeId);
     setClosing(visit.id);
@@ -1535,6 +1536,12 @@ export default function Visits() {
   const visible = cases;
   const selected = visible.some(c => c.id === active) ? active : visible[0]?.id;
   return <div className="visit-workspace">
+    {closeTarget && <div className="case-close-backdrop"><div className="case-close-dialog" role="alertdialog" aria-modal="true" aria-labelledby="case-close-title" aria-describedby="case-close-description">
+      <h2 id="case-close-title">ยกเลิกเคสนี้?</h2>
+      <p>{closeTarget.patientName} · {closeTarget.cn}</p>
+      <p id="case-close-description">ข้อมูลการตรวจในแท็บนี้จะถูกลบและไม่บันทึกเป็นประวัติการรักษา</p>
+      <div><button type="button" autoFocus onClick={()=>setCloseTarget(null)}>กลับไปตรวจต่อ</button><button type="button" className="case-close-confirm" onClick={()=>void closeCase(closeTarget)}>ยืนยันยกเลิกเคส</button></div>
+    </div></div>}
     <BackButton />
     <header className="workspace-header"><h1>🩺 ห้องตรวจ</h1><span>ฉบับร่างแยกตามผู้ป่วย · ตรวจ → จ่ายยา → รับชำระเงิน</span></header>
     {error && <p role="alert">{error}</p>}
@@ -1543,7 +1550,7 @@ export default function Visits() {
     </div>
     <div className="patient-case-tabs" role="tablist" aria-label="เคสผู้ป่วยที่เปิดอยู่">{visible.map(c => <div className="patient-case-tab" key={c.id}>
       <button role="tab" id={'tab-'+c.id} aria-selected={selected===c.id} aria-controls={'panel-'+c.id} onClick={()=>setActive(c.id)}>{c.patientName}<small>{c.cn} · {stageLabel(c.workflowStatus)}</small></button>
-      <button type="button" aria-label={'ยกเลิกเคส '+c.patientName} disabled={Boolean(closing)} onClick={()=>void closeCase(c)}>×</button>
+      <button type="button" aria-label={'ยกเลิกเคส '+c.patientName} disabled={Boolean(closing)} onClick={()=>setCloseTarget(c)}>{closing===c.id ? '…' : '×'}</button>
     </div>)}</div>
     {!visible.length && <p className="workspace-empty">ค้นหาผู้ป่วยเพื่อเริ่มตรวจ หรือเปิดฉบับร่างเดิมกลับมาทำต่อ</p>}
     {visible.map(c => <section key={c.episodeId || c.id} role="tabpanel" id={'panel-'+c.id} aria-labelledby={'tab-'+c.id} hidden={selected!==c.id}>

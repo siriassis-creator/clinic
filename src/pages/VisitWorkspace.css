@@ -20,3 +20,6 @@
 }
 .patient-clinical-summary dt { font-size: .85rem; font-weight: 600; }
 .patient-clinical-summary dd { margin: 2px 0 0; white-space: pre-wrap; }
+
+
+.case-close-backdrop{position:fixed;inset:0;z-index:2000;background:#0f172a80;display:flex;align-items:center;justify-content:center;padding:20px}.case-close-dialog{background:white;border-radius:18px;padding:24px;max-width:440px;width:100%;box-shadow:0 20px 60px #0003}.case-close-dialog h2{margin-top:0}.case-close-dialog>div{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.case-close-dialog button{min-height:44px;padding:10px 16px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;cursor:pointer;background:#f8fafc}.case-close-dialog .case-close-confirm{background:#be123c;color:white;border-color:#be123c}
