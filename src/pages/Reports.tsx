@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { collection, getDocs, doc, onSnapshot } from '../services/database';
+import { db } from '../services/database';
 import BackButton from '../components/BackButton';
 import {
   BarChart,
@@ -690,3 +690,4 @@ export default function Reports() {
     </div>
   );
 }
+

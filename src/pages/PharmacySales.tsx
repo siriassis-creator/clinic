@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection,
   addDoc,
   onSnapshot,
   doc,
   updateDoc,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+  runTransaction,
+} from '../services/database';
+import { db } from '../services/database';
 import BackButton from '../components/BackButton';
 import './Visits.css';
+import { validatePrescription } from '../services/visitWorkflow';
+import { bangkokDate } from '../services/dashboardSummary';
 
 const initialSaleState = {
   prescriptions: [] as any[],
@@ -16,6 +19,9 @@ const initialSaleState = {
 };
 
 export default function PharmacySales() {
+  const saleId = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const [saving, setSaving] = useState(false);
   const [saleData, setSaleData] = useState(initialSaleState);
   const [inventory, setInventory] = useState<any[]>([]);
   const [serviceOptions, setServiceOptions] = useState<string[]>([]);
@@ -118,51 +124,48 @@ export default function PharmacySales() {
     if (saleData.prescriptions.length === 0) return alert('กรุณาเลือกรายการยา');
     if (!window.confirm('ยืนยันการขายและตัดสต็อก?')) return;
 
+    if (submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
-      const vn = `POS${new Date()
-        .toISOString()
-        .slice(0, 10)
-        .replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      // บันทึกลง Visits เพื่อส่งไปหน้า Reports
-      await addDoc(collection(db, 'visits'), {
-        cn: 'WALK-IN',
-        patientName: 'ลูกค้าทั่วไป (หน้าร้าน)',
-        vn: vn,
-        visitDate: new Date().toISOString(),
-        chiefComplaint: 'ซื้อยาหน้าร้าน',
-        diagnosis: 'OTC Sale',
-        prescriptions: saleData.prescriptions,
-        totalAmount: saleData.totalAmount,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // ตัดสต็อกเฉพาะรายการที่เป็น "ยา"
-      for (const med of saleData.prescriptions) {
-        if (!med.isService) {
-          const currentInStock = inventory.find((i) => i.id === med.id);
-          if (currentInStock) {
-            const newQty =
-              Number(currentInStock.stockQty) - Number(med.qtyToGive);
-            await updateDoc(doc(db, 'pharmacy', med.id), {
-              stockQty: newQty.toString(),
-            });
-            await addDoc(collection(db, 'medicine_history'), {
-              medicineId: med.id,
-              type: 'OUT',
-              amount: med.qtyToGive,
-              note: `ขายหน้าร้าน (Ref: ${vn})`,
-              timestamp: new Date().toISOString(),
-            });
+      const totalAmount = validatePrescription(saleData.prescriptions);
+      const now = new Date().toISOString();
+      const vn = 'POS-' + saleId.current;
+      const visitRef = doc(db, 'visits', saleId.current);
+      await runTransaction(db, async tx => {
+        if ((await tx.get(visitRef)).exists()) return;
+        const medicines = saleData.prescriptions.filter(item => !item.isService);
+        const stocks = await Promise.all(medicines.map(item => tx.get(doc(db, 'pharmacy', item.id))));
+        medicines.forEach((item, index) => {
+          const stock = stocks[index];
+          const quantity = Number(stock.data().stockQty);
+          if (!stock.exists() || !Number.isFinite(quantity) || quantity < Number(item.qtyToGive)) {
+            throw new Error('ยา ' + item.tradeName + ' คงเหลือไม่พอ');
           }
-        }
-      }
-
+          if (stock.data().expiryDate && stock.data().expiryDate < bangkokDate(new Date())) {
+            throw new Error('ยา ' + item.tradeName + ' หมดอายุแล้ว');
+          }
+        });
+        tx.set(visitRef, {
+          cn: 'WALK-IN', patientName: 'ลูกค้าทั่วไป (หน้าร้าน)', vn,
+          visitDate: now, chiefComplaint: 'ซื้อยาหน้าร้าน', diagnosis: 'OTC Sale',
+          prescriptions: saleData.prescriptions, totalAmount,
+          workflowStatus: 'paid', paidAt: now, updatedAt: now,
+        });
+        medicines.forEach((item, index) => {
+          tx.update(doc(db, 'pharmacy', item.id), { stockQty: String(Number(stocks[index].data().stockQty) - Number(item.qtyToGive)) });
+          tx.set(doc(db, 'medicine_history', saleId.current + '_' + item.id), {
+            medicineId: item.id, type: 'OUT', amount: item.qtyToGive,
+            note: 'ขายหน้าร้าน (Ref: ' + vn + ')', timestamp: now,
+          });
+        });
+      });
       alert('✅ บันทึกการขายและตัดสต็อกเรียบร้อย');
       setSaleData(initialSaleState);
-    } catch (e) {
-      alert('❌ เกิดข้อผิดพลาด');
-    }
+      saleId.current = crypto.randomUUID();
+    } catch (e: any) {
+      alert(e.message || 'เกิดข้อผิดพลาด');
+    } finally { submitting.current = false; setSaving(false); }
   };
 
   return (
@@ -358,7 +361,7 @@ export default function PharmacySales() {
               borderRadius: '15px',
               boxShadow: '0 4px 12px rgba(30, 58, 138, 0.2)',
             }}
-            onClick={handleConfirmSale}
+            disabled={saving} onClick={handleConfirmSale}
           >
             💰 ยืนยันการรับเงินและตัดสต็อก
           </button>
@@ -534,3 +537,4 @@ export default function PharmacySales() {
     </div>
   );
 }
+

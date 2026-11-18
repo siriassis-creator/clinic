@@ -1,5 +1,6 @@
-import { collection, doc, runTransaction } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { collection, doc, runTransaction } from './database';
+import { db } from './database';
+import { auth } from './firebase';
 
 export const stageLabel = (stage: string) => ({draft:'กำลังตรวจ',awaiting_medicine:'รอรับยา',awaiting_payment:'รอชำระเงิน',paid:'เสร็จสิ้น'}[stage] || stage);
 export function validatePrescription(items: any[]) {
@@ -106,3 +107,4 @@ export async function discardCase(id: string, episodeId: string) {
     tx.delete(ref);
   });
 }
+

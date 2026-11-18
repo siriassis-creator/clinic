@@ -11,8 +11,9 @@ import {
   deleteDoc,
   runTransaction,
   getDoc,
-} from 'firebase/firestore';
-import { db, auth } from '../services/firebase';
+} from '../services/database';
+import { db } from '../services/database';
+import { auth } from '../services/firebase';
 import BackButton from '../components/BackButton';
 import './Visits.css';
 import './VisitWorkspace.css';
@@ -1550,3 +1551,4 @@ export default function Visits() {
     </section>)}
   </div>;
 }
+

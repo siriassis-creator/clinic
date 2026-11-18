@@ -20,6 +20,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import PharmacySales from './pages/PharmacySales';
 import Navbar from './components/Navbar';
+import DatabaseGate from './components/DatabaseGate';
 import { observeScrollReveal } from './components/observeScrollReveal';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
   return (
     <Router>
       <div ref={contentRef} className={user ? "clinic-app-content" : undefined}>
+      <DatabaseGate uid={user?.uid}>
       <Routes>
         {/* หน้า Login: ถ้าล็อกอินแล้วให้เด้งไปหน้าแรกเลย */}
         <Route
@@ -91,8 +93,10 @@ export default function App() {
         {/* กรณีเข้า URL อื่นที่ไม่มีในระบบ ให้ดีดกลับหน้าแรก */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </DatabaseGate>
       </div>
       {user && <Navbar contentRef={contentRef} />}
     </Router>
   );
 }
+

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from '../services/database';
 import { updateEmail, updatePassword, updateProfile } from 'firebase/auth';
-import { db, auth } from '../services/firebase';
+import { db } from '../services/database';
+import { auth } from '../services/firebase';
 import BackButton from '../components/BackButton';
 import './Visits.css';
 import { expiryWarningDays, DEFAULT_EXPIRY_WARNING_DAYS, MAX_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
@@ -356,3 +357,4 @@ export default function Settings() {
     </div>
   );
 }
+

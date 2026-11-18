@@ -139,3 +139,12 @@
 
 ## Dashboard toggle styling
 - Style the existing auto-refresh switch with an animated thumb, visible keyboard focus and reduced-motion support.
+
+
+## 2026-11-18 — Supabase database cutover
+- Clinic data uses the isolated `clinic` schema in Supabase project `jscmuurzzjkyqixiukwl`. Server API validates existing Clinic Firebase Auth tokens and account creation cutoff. Firebase Auth remains the login provider.
+- All normal page/database operations route through `/api/clinic`. The private SQL gateway uses a server-only random credential hash, collection allowlist, owner checks, optimistic versions and idempotent commits. Browser roles cannot directly read clinic tables.
+- First authenticated entry stages all nine latest Firebase collections and checks collection counts before one atomic cutover. Reads and writes to Supabase app data are gated until this finishes. If source quota is unavailable, the user sees a retry screen. Coordinate a pause of writes on other devices while this runs. Final authenticated cutover requires an existing clinic account and has not been performed by the agent.
+- Transactions cover draft saves, cancellation, dispensing/payment, OTC sale and pharmacy receipts. The dashboard preserves manual refresh and the per-entry toggle. Other pages share identical subscriptions and poll Supabase at 30-second intervals, plus refresh on app writes and tab visibility.
+- Verification: production build and eight Node tests passed. Live SQL rollback tests verified row counts, server credential rejection, conflict detection, idempotency, atomic rollback, paid archive and final import validation. Login with actual clinic credentials remains a user verification step.
+- Backup import has duplicate CN and historical medicine references retained as supplied. All 4,714 imported records are preserved pending final synchronization.

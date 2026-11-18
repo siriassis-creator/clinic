@@ -1,5 +1,6 @@
-import { collection, doc, getDocFromServer, getDocsFromServer } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { collection, doc, getDocFromServer, getDocsFromServer } from './database';
+import { db } from './database';
+import { auth } from './firebase';
 import { expiryWarningDays } from './medicineExpiry';
 
 const collections = ['patients', 'visits', 'pharmacy', 'medicine_history'] as const;
@@ -53,3 +54,4 @@ export function refreshDashboardSnapshot() {
   }
   return session.pending;
 }
+

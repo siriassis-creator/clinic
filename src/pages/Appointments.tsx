@@ -7,8 +7,8 @@ import {
   doc,
   getDoc,
   updateDoc,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+} from '../services/database';
+import { db } from '../services/database';
 import BackButton from '../components/BackButton';
 import './Visits.css';
 
@@ -205,3 +205,4 @@ export default function Appointments() {
     </div>
   );
 }
+

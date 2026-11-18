@@ -3,11 +3,12 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   doc,
   updateDoc,
   deleteDoc,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+} from '../services/database';
+import { db } from '../services/database';
 import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 
@@ -171,8 +172,9 @@ export default function Register() {
           ...baseData,
           createdAt: now,
         };
-        await addDoc(collection(db, 'patients'), dataToSave);
-        alert('ลงทะเบียนคนไข้ใหม่เรียบร้อย (รหัส: ' + formData.cn + ')');
+        const created = await addDoc(collection(db, 'patients'), dataToSave);
+        const saved = await getDoc(created);
+        alert('ลงทะเบียนคนไข้ใหม่เรียบร้อย (รหัส: ' + saved.data().cn + ')');
       }
 
       // 🆕 1. ดึงข้อมูลผู้ป่วยล่าสุดจากฐานข้อมูลทันที
@@ -667,3 +669,4 @@ export default function Register() {
     </div>
   );
 }
+

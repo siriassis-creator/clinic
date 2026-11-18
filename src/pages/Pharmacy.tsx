@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection,
   addDoc,
@@ -10,8 +10,9 @@ import {
   where,
   orderBy,
   onSnapshot,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+  runTransaction,
+} from '../services/database';
+import { db } from '../services/database';
 import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import './Pharmacy.css';
@@ -54,6 +55,9 @@ const years = Array.from({ length: 15 }, (_, i) =>
 );
 
 export default function Pharmacy() {
+  const receiptId = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
   const [warningDays, setWarningDays] = useState(DEFAULT_EXPIRY_WARNING_DAYS);
   useEffect(() => onSnapshot(doc(db, 'settings', 'appointment'), snap => {
@@ -80,33 +84,21 @@ export default function Pharmacy() {
   const [pharmacyCount, setPharmacyCount] = useState(0);
   const [isFilterLowStock, setIsFilterLowStock] = useState(false);
 
-  const loadAllData = async () => {
-    try {
-      const unsub = onSnapshot(collection(db, 'pharmacy'), (snap) => {
-        const list: any[] = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setMedicineList(list);
-        setPharmacyCount(
-          list.filter((m) => Number(m.stockQty) <= Number(m.minAlert)).length
-        );
-      });
-
-      const dSnap = await getDocs(collection(db, 'settings_dosage'));
-      const uSnap = await getDocs(collection(db, 'settings_unit'));
-      setDosageOptions(dSnap.docs.map((doc) => doc.data().label).sort());
-      setUnitOptions(uSnap.docs.map((doc) => doc.data().label).sort());
-
-      return unsub;
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   useEffect(() => {
-    loadAllData();
-  }, [activeTab]);
+    const stop = onSnapshot(collection(db, 'pharmacy'), snap => {
+      const list: any[] = snap.docs.map(row => ({ ...row.data(), id: row.id }));
+      setMedicineList(list);
+      setPharmacyCount(list.filter(medicine => Number(medicine.stockQty) <= Number(medicine.minAlert)).length);
+    });
+    let active = true;
+    Promise.all([getDocs(collection(db, 'settings_dosage')), getDocs(collection(db, 'settings_unit'))])
+      .then(([dosages, units]) => {
+        if (!active) return;
+        setDosageOptions(dosages.docs.map(row => row.data().label).sort());
+        setUnitOptions(units.docs.map(row => row.data().label).sort());
+      }).catch(error => console.error(error));
+    return () => { active = false; stop(); };
+  }, []);
 
   const handleViewHistory = async (m: any) => {
     setSelectedMedName(m.tradeName);
@@ -219,6 +211,9 @@ export default function Pharmacy() {
     e.preventDefault();
     if (!formData.expiryDate) return alert('กรุณาเลือกวันหมดอายุ');
 
+    if (submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const existingMed = !editId
         ? medicineList.find(
@@ -230,57 +225,38 @@ export default function Pharmacy() {
           )
         : null;
 
-      if (editId) {
-        await updateDoc(doc(db, 'pharmacy', editId), {
-          ...formData,
-          updatedAt: new Date().toISOString(),
+      const id = editId || existingMed?.id || receiptId.current + '_medicine';
+      const medicineRef = doc(db, 'pharmacy', id);
+      const receiptRef = doc(db, 'medicine_history', receiptId.current);
+      await runTransaction(db, async tx => {
+        if ((await tx.get(receiptRef)).exists()) return;
+        const current = await tx.get(medicineRef);
+        if ((editId || existingMed) && !current.exists()) throw new Error('ไม่พบยา กรุณาโหลดรายการใหม่');
+        if (!Number.isFinite(Number(formData.stockQty)) || Number(formData.stockQty) < 0) throw new Error('จำนวนยาต้องไม่ติดลบ');
+        const now = new Date().toISOString();
+        if (editId) {
+          tx.update(medicineRef, { ...formData, updatedAt: now });
+        } else if (current.exists()) {
+          tx.update(medicineRef, {
+            stockQty: String(Number(current.data().stockQty) + Number(formData.stockQty)),
+            costPrice: formData.costPrice, sellingPrice: formData.sellingPrice,
+            expiryDate: formData.expiryDate, updatedAt: now,
+          });
+        } else {
+          tx.set(medicineRef, { ...formData, createdAt: now, updatedAt: now });
+        }
+        tx.set(receiptRef, {
+          medicineId: id, type: editId ? 'UPDATE' : 'IN', amount: formData.stockQty,
+          note: editId ? 'แก้ไขข้อมูลเวชภัณฑ์' : 'รับยาเข้าคลัง', timestamp: now,
         });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: editId,
-          type: 'UPDATE',
-          amount: formData.stockQty,
-          note: 'แก้ไขข้อมูลเวชภัณฑ์',
-          timestamp: new Date().toISOString(),
-        });
-        alert('อัปเดตข้อมูลสำเร็จ');
-      } else if (existingMed) {
-        const newTotalQty =
-          Number(existingMed.stockQty) + Number(formData.stockQty);
-        await updateDoc(doc(db, 'pharmacy', existingMed.id), {
-          stockQty: newTotalQty.toString(),
-          costPrice: formData.costPrice,
-          sellingPrice: formData.sellingPrice,
-          expiryDate: formData.expiryDate,
-          updatedAt: new Date().toISOString(),
-        });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: existingMed.id,
-          type: 'IN',
-          amount: formData.stockQty,
-          note: `รับเข้าเพิ่ม (รวมยอดเดิม ${existingMed.stockQty})`,
-          timestamp: new Date().toISOString(),
-        });
-        alert(`รวมยอดเข้ากับรายการเดิมเรียบร้อย (คงเหลือใหม่: ${newTotalQty})`);
-      } else {
-        const docRef = await addDoc(collection(db, 'pharmacy'), {
-          ...formData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: docRef.id,
-          type: 'IN',
-          amount: formData.stockQty,
-          note: 'รับยาเข้าคลังครั้งแรก',
-          timestamp: new Date().toISOString(),
-        });
-        alert('บันทึกยาใหม่สำเร็จ');
-      }
+      });
+      receiptId.current = crypto.randomUUID();
+      alert('บันทึกยาและประวัติเรียบร้อย');
       resetForm();
       setActiveTab('list');
-    } catch (error) {
-      alert('เกิดข้อผิดพลาด');
-    }
+    } catch (error: any) {
+      alert(error.message || 'เกิดข้อผิดพลาด');
+    } finally { submitting.current = false; setSaving(false); }
   };
 
   const resetForm = () => {
@@ -628,7 +604,7 @@ export default function Pharmacy() {
               >
                 ✖ กลับ
               </button>
-              <button type="submit" className="btn-submit">
+              <button type="submit" disabled={saving} className="btn-submit">
                 💾 {editId ? 'อัปเดตข้อมูล' : 'บันทึกเข้าคลัง'}
               </button>
             </div>
@@ -939,3 +915,4 @@ export default function Pharmacy() {
     </div>
   );
 }
+
