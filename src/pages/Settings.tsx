@@ -1,3 +1,4 @@
+import DiagnosisSettings from '../components/DiagnosisSettings';
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from '../services/database';
 import { updateEmail, updatePassword, updateProfile } from 'firebase/auth';
@@ -254,6 +255,8 @@ export default function Settings() {
             </div>
           </div>
         </div>
+
+        <DiagnosisSettings />
 
         <div className="reg-section">
           <h3 className="section-title">🔐 บัญชีผู้ใช้งาน</h3>

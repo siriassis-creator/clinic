@@ -57,3 +57,11 @@ export function refreshDashboardSnapshot() {
   return session.pending;
 }
 
+
+// Keep the manually refreshed dashboard consistent with an explicit settings edit.
+export function renameCachedDiagnosis(previous: string, label: string) {
+  if (!cache?.snapshot || cache.uid !== auth.currentUser?.uid) return;
+  cache.snapshot = { ...cache.snapshot, data: { ...cache.snapshot.data,
+    visits: cache.snapshot.data.visits.map((row: Record<string, any>) => row.diagnosis === previous ? { ...row, diagnosis: label } : row),
+  } };
+}

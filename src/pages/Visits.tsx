@@ -80,7 +80,7 @@ function PatientCase({ patient, caseId, seed, isDiscarding }: { patient: any; ca
       setInventory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     const unsubDx = onSnapshot(collection(db, 'settings_diagnosis'), (snap) => {
-      setDxOptions(snap.docs.map((doc) => doc.data().label).sort());
+      setDxOptions([...new Set(snap.docs.map((doc) => doc.data().label))].sort());
     });
     // ดึงรายการค่าบริการจาก Setting
     const unsubSvc = onSnapshot(collection(db, 'settings_services'), (snap) => {
