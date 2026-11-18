@@ -55,7 +55,7 @@ begin
       if exists(select 1 from clinic_private.cutover where id and owner_uid is not null and owner_uid<>p_uid) then raise exception 'MIGRATION_BUSY'; end if;
       if not (p_request->'expected') ?& allowed or (select count(*) from jsonb_object_keys(p_request->'expected'))<>9 then raise exception 'INVALID_MANIFEST'; end if;
       update clinic_private.cutover set owner_uid=p_uid,job_id=(p_request->>'jobId')::uuid,expected=p_request->'expected' where id;
-      delete from clinic_private.import_rows;
+      delete from clinic_private.import_rows where collection = any(allowed);
     else
       if not exists(select 1 from clinic_private.cutover where id and owner_uid=p_uid and job_id=(p_request->>'jobId')::uuid) then raise exception 'INVALID_MIGRATION'; end if;
       if action='migration_upload' then
@@ -72,7 +72,7 @@ begin
           execute format('insert into clinic.%I(id,data,firestore_document) select id,data,''{}''::jsonb from clinic_private.import_rows where collection=$1 on conflict(id) do update set data=excluded.data,version=clinic.%I.version+1',name,name) using name;
         end loop;
         update clinic_private.cutover set ready=true,finished_at=now() where id;
-        delete from clinic_private.import_rows;
+        delete from clinic_private.import_rows where collection = any(allowed);
       end if;
     end if;
     return jsonb_build_object('ok',true);
