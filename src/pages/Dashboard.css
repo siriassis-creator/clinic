@@ -76,3 +76,6 @@
   background: #19558e;
 }
 .overview-refresh button:disabled { opacity: .65; }
+
+
+.income-card-breakdown{display:grid;gap:4px;margin-top:9px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b}.income-card-breakdown>span{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}.income-card-breakdown b{color:#334155;font-size:12px;font-weight:600}
