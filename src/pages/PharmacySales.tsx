@@ -8,7 +8,6 @@ import {
   runTransaction,
 } from '../services/database';
 import { db } from '../services/database';
-import BackButton from '../components/BackButton';
 import './Visits.css';
 import { validatePrescription } from '../services/visitWorkflow';
 import { bangkokDate } from '../services/dashboardSummary';
@@ -170,7 +169,6 @@ export default function PharmacySales() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header" style={{ paddingBottom: '10px' }}>
           <h1>🛒 ขายยาหน้าร้าน (POS)</h1>

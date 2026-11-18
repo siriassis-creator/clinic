@@ -14,7 +14,6 @@ import {
 } from '../services/database';
 import { db } from '../services/database';
 import { auth } from '../services/firebase';
-import BackButton from '../components/BackButton';
 import './Visits.css';
 import './VisitWorkspace.css';
 import { discardCase, finishCase, saveCaseDraft, startCase, stageLabel } from '../services/visitWorkflow';
@@ -1542,7 +1541,6 @@ export default function Visits() {
       <p id="case-close-description">ข้อมูลการตรวจในแท็บนี้จะถูกลบและไม่บันทึกเป็นประวัติการรักษา</p>
       <div><button type="button" autoFocus onClick={()=>setCloseTarget(null)}>กลับไปตรวจต่อ</button><button type="button" className="case-close-confirm" onClick={()=>void closeCase(closeTarget)}>ยืนยันยกเลิกเคส</button></div>
     </div></div>}
-    <BackButton />
     <header className="workspace-header"><h1>🩺 ห้องตรวจ</h1><span>ฉบับร่างแยกตามผู้ป่วย · ตรวจ → จ่ายยา → รับชำระเงิน</span></header>
     {error && <p role="alert">{error}</p>}
     <div className="workspace-search"><input aria-label="ค้นหาผู้ป่วยเพื่อเปิดแท็บ" placeholder="+ เปิดผู้ป่วยเพิ่ม — ชื่อ หรือ CN" value={search} onChange={e=>setSearch(e.target.value)} />

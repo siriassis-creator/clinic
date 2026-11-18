@@ -9,7 +9,6 @@ import {
   deleteDoc,
 } from '../services/database';
 import { db } from '../services/database';
-import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 
 // --- วิธีแก้ปัญหา Vite CJS/ESM Mismatch สำหรับ Library ที่อยู่ ---
@@ -234,7 +233,6 @@ export default function Register() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header">
           <h2>ทะเบียนผู้ป่วย</h2>

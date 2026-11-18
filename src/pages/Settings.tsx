@@ -4,7 +4,6 @@ import { doc, getDoc, setDoc } from '../services/database';
 import { updateEmail, updatePassword, updateProfile } from 'firebase/auth';
 import { db } from '../services/database';
 import { auth } from '../services/firebase';
-import BackButton from '../components/BackButton';
 import './Visits.css';
 import { expiryWarningDays, DEFAULT_EXPIRY_WARNING_DAYS, MAX_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
 
@@ -116,7 +115,6 @@ export default function Settings() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div
         className="reg-card fade-in"
         style={{ maxWidth: '700px', margin: '0 auto' }}

@@ -9,7 +9,6 @@ import {
   updateDoc,
 } from '../services/database';
 import { db } from '../services/database';
-import BackButton from '../components/BackButton';
 import './Visits.css';
 
 export default function Appointments() {
@@ -69,7 +68,6 @@ export default function Appointments() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header">
           <h1>📅 รายการนัดหมายติดตามผล</h1>

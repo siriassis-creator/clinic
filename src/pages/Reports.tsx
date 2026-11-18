@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, doc, onSnapshot } from '../services/database';
 import { db } from '../services/database';
-import BackButton from '../components/BackButton';
 import {
   BarChart,
   Bar,
@@ -285,7 +284,6 @@ export default function Reports() {
 
   return (
     <div className="report-page-full">
-      <BackButton />
       <div className="report-wrapper-full fade-in">
         <header className="report-top-bar">
           <div className="title-area">

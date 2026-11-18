@@ -13,7 +13,6 @@ import {
   runTransaction,
 } from '../services/database';
 import { db } from '../services/database';
-import BackButton from '../components/BackButton';
 import { useNavigate } from 'react-router-dom';
 import './Pharmacy.css';
 import { bangkokDate } from '../services/dashboardSummary';
@@ -283,7 +282,6 @@ export default function Pharmacy() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header">
           <h2>คลังยาและเวชภัณฑ์</h2>
