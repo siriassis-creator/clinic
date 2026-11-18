@@ -11,7 +11,6 @@ const primary = [
 const secondary = [
   { to: '/appointments', label: 'นัดหมาย', icon: '📅' },
   { to: '/pos', label: 'ขายยาหน้าร้าน', icon: '🛒' },
-  { to: '/reports', label: 'รายงาน', icon: '📊' },
   { to: '/settings', label: 'ตั้งค่า', icon: '⚙️' },
 ];
 
@@ -107,3 +106,4 @@ export default function Navbar({ contentRef }: { contentRef: RefObject<HTMLDivEl
     </>
   );
 }
+

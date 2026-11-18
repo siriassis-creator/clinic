@@ -9,6 +9,14 @@ export const bangkokDate = (value: string | Date) => {
 const paid = (v:Row) => !v.workflowStatus || v.workflowStatus === 'paid';
 const clinical = (v:Row) => v.cn !== 'WALK-IN' && v.workflowStatus !== 'draft';
 const sumIncome = (rows:Row[]) => rows.reduce((n,v)=>n+(Number(v.totalAmount)||0),0);
+const incomeParts = (rows: Row[]) => rows.reduce((totals, visit) => {
+  for (const item of Array.isArray(visit.prescriptions) ? visit.prescriptions : []) {
+    const amount = (Number(item.sellingPrice) || 0) * (Number(item.qtyToGive) || 0);
+    if (item.isService) totals.serviceIncome += amount;
+    else totals.medicineIncome += amount;
+  }
+  return totals;
+}, { serviceIncome: 0, medicineIncome: 0 });
 export function buildDashboard(data:Record<string,Row[]>, month:string, now=new Date(), uid?:string, warningDays=DEFAULT_EXPIRY_WARNING_DAYS) {
   const dateCache = new Map<string | Date, string>();
   const dateOf = (value: string | Date) => {
@@ -19,7 +27,10 @@ export function buildDashboard(data:Record<string,Row[]>, month:string, now=new 
   const monthClinical=visits.filter(v=>clinical(v)&&dateOf(v.examinedAt||v.visitDate).startsWith(month));
   const monthPatientCount = new Set(monthClinical.map(v => v.cn?.trim() || v.patientId || v.patientName?.trim()).filter(Boolean)).size;
   const paidVisits=visits.filter(paid);
-  const income=sumIncome(paidVisits.filter(v=>dateOf(v.paidAt||v.visitDate).startsWith(month)));
+  const monthPaid=paidVisits.filter(v=>dateOf(v.paidAt||v.visitDate).startsWith(month));
+  const income=sumIncome(monthPaid);
+  const {serviceIncome,medicineIncome}=incomeParts(monthPaid);
+  const unallocatedIncome=income-serviceIncome-medicineIncome;
   const stockMap=new Map(meds.map(m=>[m.id,m]));
   const cost=(h:Row)=>(Number(h.unitCost??h.costPrice??stockMap.get(h.medicineId)?.costPrice)||0)*(Number(h.amount)||0);
   const receipts=history.filter(h=>h.type==='IN');
@@ -37,10 +48,10 @@ export function buildDashboard(data:Record<string,Row[]>, month:string, now=new 
     .filter(patient => dateOf(patient.createdAt) === today)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const week=Array.from({length:7},(_,i)=>{const d=new Date(today+'T12:00:00+07:00');d.setUTCDate(d.getUTCDate()-(6-i));const day=dateOf(d);return{label:new Date(day+'T12:00:00+07:00').toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short'}),visits:visits.filter(v=>clinical(v)&&dateOf(v.examinedAt||v.visitDate)===day).length,patients:patients.filter(p=>dateOf(p.createdAt)===day).length};});
-  const finance=Array.from({length:6},(_,i)=>{const [y,m]=month.split('-').map(Number);const d=new Date(Date.UTC(y,m-1-(5-i),15));const key=d.toISOString().slice(0,7);return{label:d.toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',month:'short'}),income:sumIncome(paidVisits.filter(v=>dateOf(v.paidAt||v.visitDate).startsWith(key))),expense:receipts.filter(h=>dateOf(h.timestamp).startsWith(key)).reduce((n,h)=>n+cost(h),0)};});
+  const finance=Array.from({length:6},(_,i)=>{const [y,m]=month.split('-').map(Number);const d=new Date(Date.UTC(y,m-1-(5-i),15));const key=d.toISOString().slice(0,7);return{label:d.toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',month:'short'}),income:sumIncome(paidVisits.filter(v=>dateOf(v.paidAt||v.visitDate).startsWith(key))),...incomeParts(paidVisits.filter(v=>dateOf(v.paidAt||v.visitDate).startsWith(key))),expense:receipts.filter(h=>dateOf(h.timestamp).startsWith(key)).reduce((n,h)=>n+cost(h),0)};});
   const dx=new Map<string,number>();monthClinical.forEach(v=>{if(v.diagnosis)dx.set(v.diagnosis,(dx.get(v.diagnosis)||0)+1)});
   const pending={draft:0,awaiting_medicine:0,awaiting_payment:0};visits.filter(v=>!uid||v.ownerUid===uid).forEach(v=>{if(v.workflowStatus in pending)pending[v.workflowStatus as keyof typeof pending]++;});
-  return{monthClinical,monthPatientCount,income,expense,expired,expiring,low,appointments,recentPatients,todayPatients,week,finance,pending,
+  return{monthClinical,monthPatientCount,income,serviceIncome,medicineIncome,unallocatedIncome,expense,expired,expiring,low,appointments,recentPatients,todayPatients,week,finance,pending,
     stock:[{name:'ปกติ',value:meds.length-expired.length-expiring.length-lowOnly.length},{name:'สต็อกต่ำ',value:lowOnly.length},{name:'หมดอายุ',value:expired.length},{name:'ใกล้หมดอายุ',value:expiring.length}],
     alerts:[...expired.map((m):Row=>({...m,isExpired:true})),...lowOnly.map((m):Row=>({...m,isExpired:false}))],
     diagnoses:[...dx].map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count).slice(0,5),
