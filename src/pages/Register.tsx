@@ -69,6 +69,8 @@ export default function Register() {
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [patientsList, setPatientsList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
   const [editId, setEditId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState(initialFormState);
@@ -139,6 +141,13 @@ export default function Register() {
       p.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.phone?.replace(/-/g, '').includes(searchTerm.replace(/-/g, ''))
   );
+
+  const rowsPerPage = pageSize || Math.max(1, filteredPatients.length);
+  const pageCount = Math.max(1, Math.ceil(filteredPatients.length / rowsPerPage));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * rowsPerPage;
+  const visiblePatients = filteredPatients.slice(pageStart, pageStart + rowsPerPage);
+  useEffect(() => { setPage(previous => Math.min(previous, pageCount)); }, [pageCount]);
 
   const formatPhone = (val: string) => {
     let res = val.replace(/\D/g, '');
@@ -261,7 +270,7 @@ export default function Register() {
                 type="text"
                 placeholder="🔍 ค้นหา CN, ชื่อ หรือเบอร์โทร..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
                 className="search-input-inline"
               />
             </div>
@@ -621,6 +630,13 @@ export default function Register() {
 
         {activeTab === 'list' && (
           <div className="table-container fade-in">
+            <div className="patient-list-controls">
+              <label>แสดงต่อหน้า <select aria-label="จำนวนผู้ป่วยต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                {[10, 20, 25, 50, 100].map(size => <option key={size} value={size}>{size} คน</option>)}
+                <option value={0}>ทั้งหมด</option>
+              </select></label>
+              <span aria-live="polite">{filteredPatients.length ? `${pageStart + 1}–${Math.min(pageStart + rowsPerPage, filteredPatients.length)}` : '0'} จาก {filteredPatients.length} คน</span>
+            </div>
             {filteredPatients.length === 0 ? (
               <p className="empty-text">ไม่พบข้อมูล</p>
             ) : (
@@ -635,7 +651,7 @@ export default function Register() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPatients.map((p) => (
+                  {visiblePatients.map((p) => (
                     <tr key={p.id}>
                       <td className="font-bold">{p.cn}</td>
                       <td>
@@ -663,6 +679,15 @@ export default function Register() {
                 </tbody>
               </table>
             )}
+            <nav className="patient-pagination" aria-label="เปลี่ยนหน้ารายชื่อผู้ป่วย">
+              <button type="button" disabled={currentPage === 1} onClick={() => setPage(1)} aria-label="หน้าแรก">«</button>
+              <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>ก่อนหน้า</button>
+              <label>หน้า <select aria-label="เลือกหน้ารายชื่อผู้ป่วย" value={currentPage} onChange={e => setPage(Number(e.target.value))}>
+                {Array.from({length: pageCount}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+              </select> / {pageCount}</label>
+              <button type="button" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>ถัดไป</button>
+              <button type="button" disabled={currentPage === pageCount} onClick={() => setPage(pageCount)} aria-label="หน้าสุดท้าย">»</button>
+            </nav>
           </div>
         )}
       </div>
