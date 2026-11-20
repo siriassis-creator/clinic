@@ -7,3 +7,12 @@
 button:hover, a:hover, .flip-card:hover .flip-card-inner {
   transform: none !important;
 }
+
+/* The expiry warning dot is the only requested animation exception. */
+.stock-alert-dot {
+  position: absolute; top: 10px; right: 10px; width: 9px; height: 9px;
+  border-radius: 50%; background: #e11d48;
+  animation: stock-alert-blink 1.6s ease-in-out infinite !important;
+}
+@keyframes stock-alert-blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .stock-alert-dot { animation: none !important; } }
