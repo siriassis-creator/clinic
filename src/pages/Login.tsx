@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore'; // 🆕 เพิ่มการดึงข้อมูลจาก Firestore
-import { auth, db } from '../services/firebase'; // 🆕 นำเข้า db เพิ่มเติม
+import { doc, getDoc } from '../services/database'; // 🆕 เพิ่มการดึงข้อมูลจาก Firestore
+import { db } from '../services/database';
+import { auth } from '../services/firebase'; // 🆕 นำเข้า db เพิ่มเติม
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
@@ -9,25 +10,8 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [clinicName, setClinicName] = useState('กำลังโหลด...'); // 🆕 State สำหรับชื่อคลินิก
+  const [clinicName, setClinicName] = useState('เอื้องฟ้าคลินิก'); // 🆕 State สำหรับชื่อคลินิก
   const navigate = useNavigate();
-
-  // 🆕 ดึงชื่อคลินิกมาแสดงผลที่หน้า Login
-  useEffect(() => {
-    const fetchClinicName = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'settings', 'appointment'));
-        if (snap.exists() && snap.data().clinicName) {
-          setClinicName(snap.data().clinicName);
-        } else {
-          setClinicName('เอื้องฟ้าคลินิก'); // ค่าเริ่มต้นกรณีไม่พบข้อมูล
-        }
-      } catch (err) {
-        setClinicName('เอื้องฟ้าคลินิก');
-      }
-    };
-    fetchClinicName();
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,3 +61,4 @@ export default function Login() {
     </div>
   );
 }
+

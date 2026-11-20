@@ -1,13 +1,16 @@
+import DiagnosisSettings from '../components/DiagnosisSettings';
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from '../services/database';
 import { updateEmail, updatePassword, updateProfile } from 'firebase/auth';
-import { db, auth } from '../services/firebase';
-import BackButton from '../components/BackButton';
+import { db } from '../services/database';
+import { auth } from '../services/firebase';
 import './Visits.css';
+import { expiryWarningDays, DEFAULT_EXPIRY_WARNING_DAYS, MAX_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
 
 export default function Settings() {
   const [clinicName, setClinicName] = useState('');
   const [clinicSubtitle, setClinicSubtitle] = useState('');
+  const [expiryDays, setExpiryDays] = useState(String(DEFAULT_EXPIRY_WARNING_DAYS));
   const [alertDays, setAlertDays] = useState(3);
 
   // 🆕 States สำหรับตั้งค่ารายงาน
@@ -34,6 +37,7 @@ export default function Settings() {
       if (snap.exists()) {
         setClinicName(snap.data().clinicName || '');
         setClinicSubtitle(snap.data().clinicSubtitle || '');
+        setExpiryDays(String(expiryWarningDays(snap.data().expiryWarningDays)));
         setAlertDays(snap.data().alertDays || 3);
       }
 
@@ -52,6 +56,11 @@ export default function Settings() {
   }, []);
 
   const handleSaveSettings = async () => {
+    const days = Number(expiryDays);
+    if (!expiryDays.trim() || !Number.isInteger(days) || days < 0 || days > MAX_EXPIRY_WARNING_DAYS) {
+      alert('กรุณากรอกจำนวนวันเป็นจำนวนเต็มตั้งแต่ 0 ถึง ' + MAX_EXPIRY_WARNING_DAYS);
+      return;
+    }
     setLoading(true);
     try {
       // 1. บันทึกข้อมูลคลินิกและตั้งค่าระบบ
@@ -61,6 +70,7 @@ export default function Settings() {
           clinicName: clinicName,
           clinicSubtitle: clinicSubtitle,
           alertDays: Number(alertDays),
+          expiryWarningDays: days,
         },
         { merge: true }
       );
@@ -105,7 +115,6 @@ export default function Settings() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div
         className="reg-card fade-in"
         style={{ maxWidth: '700px', margin: '0 auto' }}
@@ -245,6 +254,8 @@ export default function Settings() {
           </div>
         </div>
 
+        <DiagnosisSettings />
+
         <div className="reg-section">
           <h3 className="section-title">🔐 บัญชีผู้ใช้งาน</h3>
           <div className="reg-row">
@@ -315,6 +326,16 @@ export default function Settings() {
           </div>
         </div>
 
+        <div className="reg-section">
+          <h3 className="section-title">💊 แจ้งเตือนยาใกล้หมดอายุ</h3>
+          <div className="reg-group">
+            <label htmlFor="expiry-warning-days">แจ้งเตือนก่อนวันหมดอายุ (วัน)</label>
+            <input id="expiry-warning-days" type="number" min={0} max={MAX_EXPIRY_WARNING_DAYS} step={1}
+              value={expiryDays} onChange={e => setExpiryDays(e.target.value)} />
+            <small>กรอก 0 เพื่อเตือนเฉพาะวันที่ยาหมดอายุ</small>
+          </div>
+        </div>
+
         <div className="reg-actions">
           <button
             className="btn-submit"
@@ -337,3 +358,4 @@ export default function Settings() {
     </div>
   );
 }
+

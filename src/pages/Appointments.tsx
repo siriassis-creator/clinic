@@ -7,9 +7,8 @@ import {
   doc,
   getDoc,
   updateDoc,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
-import BackButton from '../components/BackButton';
+} from '../services/database';
+import { db } from '../services/database';
 import './Visits.css';
 
 export default function Appointments() {
@@ -30,7 +29,7 @@ export default function Appointments() {
 
       // กรองออก: แสดงเฉพาะรายการที่ยังไม่มีสถานะการติดตาม
       const pendingList = list.filter(
-        (appt) => !appt.followUpStatus || appt.followUpStatus === ''
+        (appt) => appt.workflowStatus !== 'draft' && (!appt.followUpStatus || appt.followUpStatus === '')
       );
 
       setAllAppointments(
@@ -69,7 +68,6 @@ export default function Appointments() {
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header">
           <h1>📅 รายการนัดหมายติดตามผล</h1>
@@ -205,3 +203,4 @@ export default function Appointments() {
     </div>
   );
 }
+

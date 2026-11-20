@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import BackButton from '../components/BackButton';
+import { collection, getDocs, doc, onSnapshot } from '../services/database';
+import { db } from '../services/database';
 import {
   BarChart,
   Bar,
@@ -118,9 +117,7 @@ export default function Reports() {
         ...(d.data() as any),
       }));
 
-      const monthVisits = allVisits.filter(
-        (v) => v.visitDate && v.visitDate.includes(selectedMonth)
-      );
+      const monthVisits = allVisits.filter(v => !v.workflowStatus || v.workflowStatus === 'paid').map(v => ({...v, visitDate: v.paidAt || v.visitDate})).filter(v => v.visitDate && v.visitDate.includes(selectedMonth));
       const monthHistory = allHistory.filter(
         (h) =>
           h.timestamp && h.timestamp.includes(selectedMonth) && h.type === 'IN'
@@ -130,6 +127,7 @@ export default function Reports() {
       setTotalAppts(
         allVisits.filter(
           (v) =>
+            v.workflowStatus !== 'draft' &&
             v.nextAppt &&
             v.nextAppt >= todayStr &&
             (!v.followUpStatus || v.followUpStatus === '')
@@ -286,7 +284,6 @@ export default function Reports() {
 
   return (
     <div className="report-page-full">
-      <BackButton />
       <div className="report-wrapper-full fade-in">
         <header className="report-top-bar">
           <div className="title-area">
@@ -691,3 +688,4 @@ export default function Reports() {
     </div>
   );
 }
+

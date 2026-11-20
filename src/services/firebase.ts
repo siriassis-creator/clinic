@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
-import { getFirestore } from 'firebase/firestore';
+
 import { getAuth } from 'firebase/auth'; // 🟢 1. เพิ่ม Import สำหรับระบบ Login
 
 const firebaseConfig = {
@@ -21,4 +21,5 @@ export const analytics = getAnalytics(app);
 export const auth = getAuth(app);
 
 // ส่งออก db สำหรับจัดการฐานข้อมูล (เหมือนเดิม)
-export const db = getFirestore(app);
+
+

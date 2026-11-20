@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   collection,
   addDoc,
@@ -10,11 +10,13 @@ import {
   where,
   orderBy,
   onSnapshot,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
-import BackButton from '../components/BackButton';
+  runTransaction,
+} from '../services/database';
+import { db } from '../services/database';
 import { useNavigate } from 'react-router-dom';
 import './Pharmacy.css';
+import { bangkokDate } from '../services/dashboardSummary';
+import { expiryWarningDays, medicineExpiryStatus, DEFAULT_EXPIRY_WARNING_DAYS } from '../services/medicineExpiry';
 
 const initialFormState = {
   tradeName: '',
@@ -52,10 +54,20 @@ const years = Array.from({ length: 15 }, (_, i) =>
 );
 
 export default function Pharmacy() {
+  const receiptId = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+  const [warningDays, setWarningDays] = useState(DEFAULT_EXPIRY_WARNING_DAYS);
+  useEffect(() => onSnapshot(doc(db, 'settings', 'appointment'), snap => {
+    setWarningDays(expiryWarningDays(snap.data()?.expiryWarningDays));
+  }, error => console.error('Unable to load expiry warning settings', error)), []);
+  const today = bangkokDate(new Date());
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [medicineList, setMedicineList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
   const [editId, setEditId] = useState<string | null>(null);
   const [formData, setFormData] = useState(initialFormState);
   const [expiry, setExpiry] = useState({ day: '', month: '', year: '' });
@@ -73,33 +85,21 @@ export default function Pharmacy() {
   const [pharmacyCount, setPharmacyCount] = useState(0);
   const [isFilterLowStock, setIsFilterLowStock] = useState(false);
 
-  const loadAllData = async () => {
-    try {
-      const unsub = onSnapshot(collection(db, 'pharmacy'), (snap) => {
-        const list: any[] = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setMedicineList(list);
-        setPharmacyCount(
-          list.filter((m) => Number(m.stockQty) <= Number(m.minAlert)).length
-        );
-      });
-
-      const dSnap = await getDocs(collection(db, 'settings_dosage'));
-      const uSnap = await getDocs(collection(db, 'settings_unit'));
-      setDosageOptions(dSnap.docs.map((doc) => doc.data().label).sort());
-      setUnitOptions(uSnap.docs.map((doc) => doc.data().label).sort());
-
-      return unsub;
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   useEffect(() => {
-    loadAllData();
-  }, [activeTab]);
+    const stop = onSnapshot(collection(db, 'pharmacy'), snap => {
+      const list: any[] = snap.docs.map(row => ({ ...row.data(), id: row.id }));
+      setMedicineList(list);
+      setPharmacyCount(list.filter(medicine => Number(medicine.stockQty) <= Number(medicine.minAlert)).length);
+    });
+    let active = true;
+    Promise.all([getDocs(collection(db, 'settings_dosage')), getDocs(collection(db, 'settings_unit'))])
+      .then(([dosages, units]) => {
+        if (!active) return;
+        setDosageOptions(dosages.docs.map(row => row.data().label).sort());
+        setUnitOptions(units.docs.map(row => row.data().label).sort());
+      }).catch(error => console.error(error));
+    return () => { active = false; stop(); };
+  }, []);
 
   const handleViewHistory = async (m: any) => {
     setSelectedMedName(m.tradeName);
@@ -212,6 +212,9 @@ export default function Pharmacy() {
     e.preventDefault();
     if (!formData.expiryDate) return alert('กรุณาเลือกวันหมดอายุ');
 
+    if (submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const existingMed = !editId
         ? medicineList.find(
@@ -223,57 +226,38 @@ export default function Pharmacy() {
           )
         : null;
 
-      if (editId) {
-        await updateDoc(doc(db, 'pharmacy', editId), {
-          ...formData,
-          updatedAt: new Date().toISOString(),
+      const id = editId || existingMed?.id || receiptId.current + '_medicine';
+      const medicineRef = doc(db, 'pharmacy', id);
+      const receiptRef = doc(db, 'medicine_history', receiptId.current);
+      await runTransaction(db, async tx => {
+        if ((await tx.get(receiptRef)).exists()) return;
+        const current = await tx.get(medicineRef);
+        if ((editId || existingMed) && !current.exists()) throw new Error('ไม่พบยา กรุณาโหลดรายการใหม่');
+        if (!Number.isFinite(Number(formData.stockQty)) || Number(formData.stockQty) < 0) throw new Error('จำนวนยาต้องไม่ติดลบ');
+        const now = new Date().toISOString();
+        if (editId) {
+          tx.update(medicineRef, { ...formData, updatedAt: now });
+        } else if (current.exists()) {
+          tx.update(medicineRef, {
+            stockQty: String(Number(current.data().stockQty) + Number(formData.stockQty)),
+            costPrice: formData.costPrice, sellingPrice: formData.sellingPrice,
+            expiryDate: formData.expiryDate, updatedAt: now,
+          });
+        } else {
+          tx.set(medicineRef, { ...formData, createdAt: now, updatedAt: now });
+        }
+        tx.set(receiptRef, {
+          medicineId: id, type: editId ? 'UPDATE' : 'IN', amount: formData.stockQty,
+          note: editId ? 'แก้ไขข้อมูลเวชภัณฑ์' : 'รับยาเข้าคลัง', timestamp: now,
         });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: editId,
-          type: 'UPDATE',
-          amount: formData.stockQty,
-          note: 'แก้ไขข้อมูลเวชภัณฑ์',
-          timestamp: new Date().toISOString(),
-        });
-        alert('อัปเดตข้อมูลสำเร็จ');
-      } else if (existingMed) {
-        const newTotalQty =
-          Number(existingMed.stockQty) + Number(formData.stockQty);
-        await updateDoc(doc(db, 'pharmacy', existingMed.id), {
-          stockQty: newTotalQty.toString(),
-          costPrice: formData.costPrice,
-          sellingPrice: formData.sellingPrice,
-          expiryDate: formData.expiryDate,
-          updatedAt: new Date().toISOString(),
-        });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: existingMed.id,
-          type: 'IN',
-          amount: formData.stockQty,
-          note: `รับเข้าเพิ่ม (รวมยอดเดิม ${existingMed.stockQty})`,
-          timestamp: new Date().toISOString(),
-        });
-        alert(`รวมยอดเข้ากับรายการเดิมเรียบร้อย (คงเหลือใหม่: ${newTotalQty})`);
-      } else {
-        const docRef = await addDoc(collection(db, 'pharmacy'), {
-          ...formData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        await addDoc(collection(db, 'medicine_history'), {
-          medicineId: docRef.id,
-          type: 'IN',
-          amount: formData.stockQty,
-          note: 'รับยาเข้าคลังครั้งแรก',
-          timestamp: new Date().toISOString(),
-        });
-        alert('บันทึกยาใหม่สำเร็จ');
-      }
+      });
+      receiptId.current = crypto.randomUUID();
+      alert('บันทึกยาและประวัติเรียบร้อย');
       resetForm();
       setActiveTab('list');
-    } catch (error) {
-      alert('เกิดข้อผิดพลาด');
-    }
+    } catch (error: any) {
+      alert(error.message || 'เกิดข้อผิดพลาด');
+    } finally { submitting.current = false; setSaving(false); }
   };
 
   const resetForm = () => {
@@ -294,13 +278,20 @@ export default function Pharmacy() {
     return matchesSearch && matchesLowStock;
   });
 
+  const rowsPerPage = pageSize || Math.max(1, displayList.length);
+  const pageCount = Math.max(1, Math.ceil(displayList.length / rowsPerPage));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * rowsPerPage;
+  const visibleMedicines = displayList.slice(pageStart, pageStart + rowsPerPage);
+  useEffect(() => { setPage(1); }, [searchTerm, isFilterLowStock]);
+  useEffect(() => { setPage(previous => Math.min(previous, pageCount)); }, [pageCount]);
+
   const lowStockItemsCount = medicineList.filter(
     (m) => Number(m.stockQty) <= Number(m.minAlert)
   ).length;
 
   return (
     <div className="reg-container">
-      <BackButton />
       <div className="reg-card fade-in">
         <header className="reg-header">
           <h2>คลังยาและเวชภัณฑ์</h2>
@@ -621,7 +612,7 @@ export default function Pharmacy() {
               >
                 ✖ กลับ
               </button>
-              <button type="submit" className="btn-submit">
+              <button type="submit" disabled={saving} className="btn-submit">
                 💾 {editId ? 'อัปเดตข้อมูล' : 'บันทึกเข้าคลัง'}
               </button>
             </div>
@@ -672,17 +663,27 @@ export default function Pharmacy() {
               </div>
             </div>
 
+            <div className="patient-list-controls">
+              <label>แสดงต่อหน้า <select aria-label="จำนวนรายการยาต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                {[10, 20, 25, 50, 100].map(size => <option key={size} value={size}>{size} รายการ</option>)}
+                <option value={0}>ทั้งหมด</option>
+              </select></label>
+              <span aria-live="polite">{displayList.length ? `${pageStart + 1}–${Math.min(pageStart + rowsPerPage, displayList.length)}` : '0'} จาก {displayList.length} รายการ</span>
+            </div>
             <div className="table-container">
               <table className="patient-table">
                 <thead>
                   <tr>
                     <th>ชื่อยา</th>
                     <th>คงเหลือ</th>
+                    <th>วันหมดอายุ</th>
                     <th>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayList.map((m) => (
+                  {visibleMedicines.map((m) => {
+                    const expiryStatus = medicineExpiryStatus(m.expiryDate, today, warningDays);
+                    return (
                     <tr key={m.id}>
                       <td>
                         <strong>{m.tradeName}</strong>
@@ -701,6 +702,11 @@ export default function Pharmacy() {
                         >
                           {m.stockQty} {m.unit}
                         </span>
+                      </td>
+                      <td>
+                        {expiryStatus === 'unknown' ? '—' : new Date(m.expiryDate + 'T12:00:00+07:00').toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}
+                        {expiryStatus === 'expired' && <div><span className="badge badge-red">หมดอายุ</span></div>}
+                        {expiryStatus === 'expiring' && <div><span className="badge badge-orange">ใกล้หมดอายุ</span></div>}
                       </td>
                       <td>
                         <button
@@ -737,7 +743,8 @@ export default function Pharmacy() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               {displayList.length === 0 && (
@@ -749,6 +756,15 @@ export default function Pharmacy() {
                 </p>
               )}
             </div>
+            <nav className="patient-pagination" aria-label="เปลี่ยนหน้ารายการยา">
+              <button type="button" disabled={currentPage===1} onClick={()=>setPage(1)} aria-label="หน้าแรก">«</button>
+              <button type="button" disabled={currentPage===1} onClick={()=>setPage(currentPage-1)}>ก่อนหน้า</button>
+              <label>หน้า <select aria-label="เลือกหน้ารายการยา" value={currentPage} onChange={e=>setPage(Number(e.target.value))}>
+                {Array.from({length:pageCount},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}
+              </select> / {pageCount}</label>
+              <button type="button" disabled={currentPage===pageCount} onClick={()=>setPage(currentPage+1)}>ถัดไป</button>
+              <button type="button" disabled={currentPage===pageCount} onClick={()=>setPage(pageCount)} aria-label="หน้าสุดท้าย">»</button>
+            </nav>
           </div>
         )}
       </div>
@@ -923,3 +939,4 @@ export default function Pharmacy() {
     </div>
   );
 }
+

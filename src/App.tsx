@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './services/firebase';
+import { resetDashboardSnapshot } from './services/dashboardSnapshot';
 
 // Import หน้าต่างๆ ของคุณ
 import Login from './pages/Login';
@@ -19,6 +20,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import PharmacySales from './pages/PharmacySales';
 import Navbar from './components/Navbar';
+import DatabaseGate from './components/DatabaseGate';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -26,6 +28,7 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
+      resetDashboardSnapshot(currentUser?.uid);
       setUser(currentUser);
       setLoading(false);
     });
@@ -37,6 +40,7 @@ export default function App() {
   return (
     <Router>
       <div className={user ? "clinic-app-content" : undefined}>
+      <DatabaseGate uid={user?.uid}>
       <Routes>
         {/* หน้า Login: ถ้าล็อกอินแล้วให้เด้งไปหน้าแรกเลย */}
         <Route
@@ -83,8 +87,10 @@ export default function App() {
         {/* กรณีเข้า URL อื่นที่ไม่มีในระบบ ให้ดีดกลับหน้าแรก */}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </DatabaseGate>
       </div>
       {user && <Navbar />}
     </Router>
   );
 }
+
