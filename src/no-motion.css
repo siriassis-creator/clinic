@@ -1,0 +1,9 @@
+/* The clinic interface changes state immediately on every page. */
+*, *::before, *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+button:hover, a:hover, .flip-card:hover .flip-card-inner {
+  transform: none !important;
+}

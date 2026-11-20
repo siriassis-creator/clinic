@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import './Navbar.css';
 
@@ -13,20 +13,14 @@ const menus = [
   { to: '/settings', label: 'ตั้งค่า', icon: '⚙️' },
 ];
 
-const menuOrder = menus.map(item => item.to);
 
-export default function Navbar({ contentRef }: { contentRef: RefObject<HTMLDivElement | null> }) {
+export default function Navbar() {
   const { pathname } = useLocation();
-  const previousPath = useRef(pathname);
   const nav = useRef<HTMLElement>(null);
   const indicator = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
-
-    const from = menuOrder.indexOf(previousPath.current);
-    const to = menuOrder.indexOf(pathname);
-    previousPath.current = pathname;
 
     const navElement = nav.current;
     const active = navElement?.querySelector<HTMLElement>('.clinic-bottom-item.is-active');
@@ -41,27 +35,8 @@ export default function Navbar({ contentRef }: { contentRef: RefObject<HTMLDivEl
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(positionIndicator);
     if (navElement) resize?.observe(navElement);
 
-    const content = contentRef.current;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const animation = content && typeof content.animate === 'function' && from >= 0 && to >= 0 && from !== to && !reduced.matches
-      ? content.animate(
-          [
-            { opacity: 0.35, transform: 'translateY(20px)' },
-            { opacity: 1, transform: 'none' },
-          ],
-          { duration: 280, easing: 'cubic-bezier(.2,.75,.25,1)' },
-        )
-      : undefined;
-    const stopMotion = () => {
-      if (reduced.matches) animation?.cancel();
-    };
-    reduced.addEventListener('change', stopMotion);
-    return () => {
-      resize?.disconnect();
-      reduced.removeEventListener('change', stopMotion);
-      animation?.cancel();
-    };
-  }, [pathname, contentRef]);
+    return () => { resize?.disconnect(); };
+  }, [pathname]);
 
   return (
     <>
