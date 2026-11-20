@@ -66,6 +66,8 @@ export default function Pharmacy() {
   const [activeTab, setActiveTab] = useState<'register' | 'list'>('register');
   const [medicineList, setMedicineList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
   const [editId, setEditId] = useState<string | null>(null);
   const [formData, setFormData] = useState(initialFormState);
   const [expiry, setExpiry] = useState({ day: '', month: '', year: '' });
@@ -275,6 +277,14 @@ export default function Pharmacy() {
 
     return matchesSearch && matchesLowStock;
   });
+
+  const rowsPerPage = pageSize || Math.max(1, displayList.length);
+  const pageCount = Math.max(1, Math.ceil(displayList.length / rowsPerPage));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * rowsPerPage;
+  const visibleMedicines = displayList.slice(pageStart, pageStart + rowsPerPage);
+  useEffect(() => { setPage(1); }, [searchTerm, isFilterLowStock]);
+  useEffect(() => { setPage(previous => Math.min(previous, pageCount)); }, [pageCount]);
 
   const lowStockItemsCount = medicineList.filter(
     (m) => Number(m.stockQty) <= Number(m.minAlert)
@@ -653,6 +663,13 @@ export default function Pharmacy() {
               </div>
             </div>
 
+            <div className="patient-list-controls">
+              <label>แสดงต่อหน้า <select aria-label="จำนวนรายการยาต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                {[10, 20, 25, 50, 100].map(size => <option key={size} value={size}>{size} รายการ</option>)}
+                <option value={0}>ทั้งหมด</option>
+              </select></label>
+              <span aria-live="polite">{displayList.length ? `${pageStart + 1}–${Math.min(pageStart + rowsPerPage, displayList.length)}` : '0'} จาก {displayList.length} รายการ</span>
+            </div>
             <div className="table-container">
               <table className="patient-table">
                 <thead>
@@ -664,7 +681,7 @@ export default function Pharmacy() {
                   </tr>
                 </thead>
                 <tbody>
-                  {displayList.map((m) => {
+                  {visibleMedicines.map((m) => {
                     const expiryStatus = medicineExpiryStatus(m.expiryDate, today, warningDays);
                     return (
                     <tr key={m.id}>
@@ -739,6 +756,15 @@ export default function Pharmacy() {
                 </p>
               )}
             </div>
+            <nav className="patient-pagination" aria-label="เปลี่ยนหน้ารายการยา">
+              <button type="button" disabled={currentPage===1} onClick={()=>setPage(1)} aria-label="หน้าแรก">«</button>
+              <button type="button" disabled={currentPage===1} onClick={()=>setPage(currentPage-1)}>ก่อนหน้า</button>
+              <label>หน้า <select aria-label="เลือกหน้ารายการยา" value={currentPage} onChange={e=>setPage(Number(e.target.value))}>
+                {Array.from({length:pageCount},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}
+              </select> / {pageCount}</label>
+              <button type="button" disabled={currentPage===pageCount} onClick={()=>setPage(currentPage+1)}>ถัดไป</button>
+              <button type="button" disabled={currentPage===pageCount} onClick={()=>setPage(pageCount)} aria-label="หน้าสุดท้าย">»</button>
+            </nav>
           </div>
         )}
       </div>
